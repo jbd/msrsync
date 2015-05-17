@@ -778,7 +778,6 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
         elif ret != 0:
             print >>sys.stderr, '''Error during rsync command "%s": %s''' % (rsync_cmd, 2*os.linesep + stderr)
             sys.exit(ERSYNC_JOB)
-        print >>sys.stderr, "%s" % rsync_cmd
     except OSError, err:
         print >>sys.stderr, '''Error during rsync command "%s": %s''' % (rsync_cmd, 2*os.linesep + err)
         sys.exit(ERSYNC_JOB)
