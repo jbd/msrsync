@@ -1,6 +1,8 @@
 # msrsync: maximize your rsync bandwidth usage
 
-msrsync (Multi-stream rsync) is a python wrapper around rsync. It will split the transfer in multiple buckets while the source is scanned and will hopefully help maximizing the usage of the available bandwidth by running a configurable number of rsync processes in parallel. The main limitation is it does not handle remote source or target directory, they must be locally accessible (local disk, nfs/cifs/other mountpoint).
+msrsync (Multi-stream rsync) is a python wrapper around rsync.
+
+It will split the transfer in multiple buckets while the source is scanned and will hopefully help maximizing the usage of the available bandwidth by running a configurable number of rsync processes in parallel. The main limitation is it does not handle remote source or target directory, they must be locally accessible (local disk, nfs/cifs/other mountpoint).
 
 Quick example:
 
