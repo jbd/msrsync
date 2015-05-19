@@ -103,15 +103,17 @@ Ran 29 tests in 3.320s
 
 OK
 ```
-- The benchmarks are for testing purpose. They are comparing the performance between vanilla rsync and msrsync using multiple options. Since I'm just creating a huge fake file tree with empty files, you won't see any msrsync benefits here, unless you're trying with many may files. Please test on real data instead =). They need to be run as root since I'm dropping disk cache between run.
+- The benchmarks are for testing purpose. They are comparing the performance between vanilla rsync and msrsync using multiple options. Since I'm just creating a huge fake file tree with empty files, you won't see any msrsync benefits here, unless you're trying with many many files. Please test on real data instead =). They need to be run as root since I'm dropping disk cache between run.
 
 ```bash
 $ sudo make bench # or msrsync --bench
-Benchmarks with 10000 entries (95% of files):
-rsync -a --numeric-ids took 1.45 seconds (speedup x1)
-msrsync --processes 1 --files 1000 --size 1G took 1.91 seconds (speedup x0.76)
-msrsync --processes 2 --files 1000 --size 1G took 1.27 seconds (speedup x1.15)
-msrsync --processes 4 --files 1000 --size 1G took 0.92 seconds (speedup x1.58)
+Benchmarks with 100000 entries (95% of files):
+rsync -a --numeric-ids took 14.05 seconds (speedup x1)
+msrsync --processes 1 --files 1000 --size 1G took 18.58 seconds (speedup x0.76)
+msrsync --processes 2 --files 1000 --size 1G took 10.61 seconds (speedup x1.32)
+msrsync --processes 4 --files 1000 --size 1G took 6.60 seconds (speedup x2.13)
+msrsync --processes 8 --files 1000 --size 1G took 6.58 seconds (speedup x2.14)
+msrsync --processes 16 --files 1000 --size 1G took 6.66 seconds (speedup x2.11)
 ```
 - This may seem obvious but if the source or the destination of the copy cannot handle parallel I/O well, you won't see any benefits (quite the opposite in fact) using msrsync. 
 

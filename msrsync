@@ -1338,7 +1338,7 @@ def drop_caches(value=3):
             proc_file.write(str(value))
 
 
-def bench(total_entries=1000, max_entries_per_level=128, max_depth=5, files_pct=95, src=None, dst=None):
+def bench(total_entries=10000, max_entries_per_level=128, max_depth=5, files_pct=95, src=None, dst=None):
     """
     Embedded benchmark runner
     """
@@ -1398,6 +1398,16 @@ def bench(total_entries=1000, max_entries_per_level=128, max_depth=5, files_pct=
 
         _run_msrsync_bench_and_print('--processes 4 --files 1000 --size 1G', src + os.sep, dst_in_dst, rsync_elapsed)
 
+        shutil.rmtree(dst_in_dst, onerror=rmtree_onerror)
+        drop_caches()
+
+        _run_msrsync_bench_and_print('--processes 8 --files 1000 --size 1G', src + os.sep, dst_in_dst, rsync_elapsed)
+
+        shutil.rmtree(dst_in_dst, onerror=rmtree_onerror)
+        drop_caches()
+
+        _run_msrsync_bench_and_print('--processes 16 --files 1000 --size 1G', src + os.sep, dst_in_dst, rsync_elapsed)
+
     finally:
         if cleanup_src and os.path.exists(src):
             shutil.rmtree(src, onerror=rmtree_onerror)
@@ -1405,7 +1415,7 @@ def bench(total_entries=1000, max_entries_per_level=128, max_depth=5, files_pct=
             shutil.rmtree(dst, onerror=rmtree_onerror)
 
 
-def benchshm(total_entries=1000, max_entries_per_level=128, max_depth=5, files_pct=95):
+def benchshm(total_entries=10000, max_entries_per_level=128, max_depth=5, files_pct=95):
     """
     Embedded benchmark runner
     """
@@ -1432,11 +1442,11 @@ def main(cmdline):
         sys.exit(0)
 
     if options.bench and _check_root():
-        bench(total_entries=10000)
+        bench(total_entries=100000)
         sys.exit(0)
 
     if options.benchshm and _check_root():
-        benchshm(total_entries=10000)
+        benchshm(total_entries=100000)
         sys.exit(0)
 
     _check_executables()
