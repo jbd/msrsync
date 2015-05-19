@@ -73,7 +73,7 @@ $ msrsync -p4 --rsync "-a --numeric-ids --inplace" source destination
 
 ## Notes
 
-- The rsync processes are always run with the --files-from option, not matter what.
+- The rsync processes are always run with the --files-from and --from0, no matter what. --from0 option affects --exclude-from, --include-from, --files-from, and any merged files specified in a --filter rule.
 
 - There is an integrated test suite (--selftest option, or make test). Since I'm using unittest from python 2.6 library, I cannot capture the output of the tests (buffer parameter from TestResult object appeared in 2.7).
 
@@ -132,9 +132,3 @@ Please use `make <target>' where <target> is one of
   bench         => run benchmarks (linux only. Need root to drop buffer cache between run)
   benchshm      => run benchmarks using /dev/shm (linux only. Need root to drop buffer cache between run)
 ```
-
- 
-
-
-
-
