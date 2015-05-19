@@ -38,7 +38,7 @@ $ git clone https://github.com/jbd/msrsync && cd msrsync && sudo make install
 
 ## Usage
 
-```bash
+```
 $ msrsync --help
 usage: msrsync [options] [--rsync "rsync-options-string"] SRCDIR [SRCDIR2...] DESTDIR
    or: msrsync --selftest
@@ -71,7 +71,7 @@ $ msrsync -p4 --rsync "-a --numeric-ids --inplace" source destination
 
 You can launch a benchmark using the *--bench* option or *make test*. It is only for testing purpose. They are comparing the performance between vanilla *rsync* and *msrsync* using multiple options. Since I'm just creating a huge fake file tree with empty files, you won't see any *msrsync* benefits here, unless you're trying with many many files. They need to be run as root since I'm dropping disk cache between run.
 
-```bash
+```
 $ sudo make bench # or sudo msrsync --bench
 Benchmarks with 100000 entries (95% of files):
 rsync -a --numeric-ids took 14.05 seconds (speedup x1)
@@ -94,7 +94,7 @@ Please test on real data instead =). There is also a *--benchshm* option that wi
 
 I'm targeting python 2.6 without external dependencies besides rsync. The provided Makefile is just an helper around the embedded testing and coverage.py:
 
-```bash
+```
 $ make help
 Please use `make <target>' where <target> is one of
   clean         => clean all generated files
@@ -110,7 +110,7 @@ Please use `make <target>' where <target> is one of
 ```
 There is an integrated test suite (*--selftest* option, or *make test*). Since I'm using unittest from python 2.6 library, I cannot capture the output of the tests (buffer parameter from TestResult object appeared in 2.7).
 
-```bash
+```
 $ make test # or msrsync --selftest
 test_get_human_size (__main__.TestHelpers)
 convert bytes to human readable string ... ok
