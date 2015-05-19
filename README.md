@@ -1,8 +1,8 @@
 # msrsync: maximize your rsync bandwidth usage
 
-*msrsync* (multi-stream rsync) is a python wrapper around *rsync*.
+`msrsync` (multi-stream rsync) is a python wrapper around `rsync`.
 
-It will split the transfer in multiple buckets while the source is scanned and will hopefully help maximizing the usage of the available bandwidth by running a configurable number of *rsync* processes in parallel. The main limitation is it does not handle remote source or target directory, they must be locally accessible (local disk, nfs/cifs/other mountpoint).
+It will split the transfer in multiple buckets while the source is scanned and will hopefully help maximizing the usage of the available bandwidth by running a configurable number of `rsync` processes in parallel. The main limitation is it does not handle remote source or target directory, they must be locally accessible (local disk, nfs/cifs/other mountpoint).
 
 Quick example:
 
@@ -10,13 +10,13 @@ Quick example:
 $ msrsync -p 4 /source /destination
 ```
 
-This will copy /source directory in the /destination directory (same behaviour as *rsync* regarding the slash handling) using 4 *rsync* processes (using *"-a --numeric-ids"* as default option. Could be override with *--rsync* option). *msrsync* will split the files and directory list into bucket of 1G or 1000 files maximum (see *--size* and *--files* options) before feeding them to each *rsync* process in parallel using the *--files-from* option. As long as the source and the destination can cope with the parallel I/O (think big boring "enterprise grade" NAS), it should be faster than a single *rsync*.
+This will copy /source directory in the /destination directory (same behaviour as `rsync` regarding the slash handling) using 4 `rsync` processes (using `"-a --numeric-ids"` as default option. Could be override with `--rsync` option). `msrsync` will split the files and directory list into bucket of 1G or 1000 files maximum (see `--size` and `--files` options) before feeding them to each `rsync` process in parallel using the `--files-from` option. As long as the source and the destination can cope with the parallel I/O (think big boring "enterprise grade" NAS), it should be faster than a single `rsync`.
 
-> *msrsync* shares the same spirit as [fpart](https://github.com/martymac/fpart) (and its [fpsync](https://github.com/martymac/fpart/blob/master/tools/fpsync) associated tool) by Ganaël Laplanche or [parsync](http://moo.nac.uci.edu/~hjm/parsync/) by Harry Mangalam. Those are two fantastic much more complete tools used in the field to do real work. Please check them out, they might be what you're looking for.
+> `msrsync` shares the same spirit as [fpart](https://github.com/martymac/fpart) (and its [fpsync](https://github.com/martymac/fpart/blob/master/tools/fpsync) associated tool) by Ganaël Laplanche or [parsync](http://moo.nac.uci.edu/~hjm/parsync/) by Harry Mangalam. Those are two fantastic much more complete tools used in the field to do real work. Please check them out, they might be what you're looking for.
 
 ## Motivation
 
-Why write *msrsync* if tools like [fpart](https://github.com/martymac/fpart) and [parsync](http://moo.nac.uci.edu/~hjm/parsync/) exist ? While reasonnable, their dependencies can be a point of friction given the constraints we can have on a given system. When you're lucky, you can use your package manager ([fpart](https://github.com/martymac/fpart) seems to be well supported among various GNU/Linux and FreeBSD distribution: [FreeBSD](http://www.freshports.org/sysutils/fpart), [Debian](http://packages.debian.org/fpart), [Ubuntu](http://packages.ubuntu.com/fpart), [Archlinux](https://aur.archlinux.org/packages/fpart/), [OBS](https://build.opensuse.org/package/show/home:mgoppold/fpart)) to deal with the requirements but more often than not, I found myself struggling with the sad state of the machine I'm working with.
+Why write `msrsync` if tools like [fpart](https://github.com/martymac/fpart) and [parsync](http://moo.nac.uci.edu/~hjm/parsync/) exist ? While reasonnable, their dependencies can be a point of friction given the constraints we can have on a given system. When you're lucky, you can use your package manager ([fpart](https://github.com/martymac/fpart) seems to be well supported among various GNU/Linux and FreeBSD distribution: [FreeBSD](http://www.freshports.org/sysutils/fpart), [Debian](http://packages.debian.org/fpart), [Ubuntu](http://packages.ubuntu.com/fpart), [Archlinux](https://aur.archlinux.org/packages/fpart/), [OBS](https://build.opensuse.org/package/show/home:mgoppold/fpart)) to deal with the requirements but more often than not, I found myself struggling with the sad state of the machine I'm working with.
 
 That's why the only dependencies of msrsync are [python](https://www.python.org/) >=2.6 and [rsync](https://rsync.samba.org/). What python 2.6 ? I'm aiming RHEL6 like distribution as a minimum requirement here, so I'm stuck with python 2.6. I miss some cool features, but that's part of the project.
 
@@ -26,7 +26,7 @@ That's why the only dependencies of msrsync are [python](https://www.python.org/
 
 ## Installation
 
-*msrsync* is a single python file, you just have to download it. Or if you prefer, you can clone the repository and use the provided Makefile:
+`msrsync` is a single python file, you just have to download it. Or if you prefer, you can clone the repository and use the provided Makefile:
 
 ```bash
 $ wget https://raw.githubusercontent.com/jbd/msrsync/master/msrsync && chmod +x msrsync
@@ -52,7 +52,7 @@ msrsync options:
     -j, --show            show bucket directory
 
 rsync options:
-    -r, --rsync ...       MUST be last option. rsync options as a quoted string ["-a --numeric-ids"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for
+    -r, --rsync ...       MUST be last option. rsync options as a quoted string ["-a --numeric-ids"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync `from/filter files if you want to use them. See rsync(1) manpage for
                             details.
 
 self-test options:
@@ -61,7 +61,7 @@ self-test options:
     -g, --benchshm        run benchmarks in /dev/shm
 ```
 
-If you want to use specific options for the rsync processes, use the *--rsync* option:
+If you want to use specific options for the rsync processes, use the `--rsync` option:
 
 ```bash
 $ msrsync -p4 --rsync "-a --numeric-ids --inplace" source destination
@@ -69,7 +69,7 @@ $ msrsync -p4 --rsync "-a --numeric-ids --inplace" source destination
 
 ## Performance
 
-You can launch a benchmark using the *--bench* option or *make test*. It is only for testing purpose. They are comparing the performance between vanilla *rsync* and *msrsync* using multiple options. Since I'm just creating a huge fake file tree with empty files, you won't see any *msrsync* benefits here, unless you're trying with many many files. They need to be run as root since I'm dropping disk cache between run.
+You can launch a benchmark using the `--bench` option or `make test`. It is only for testing purpose. They are comparing the performance between vanilla `rsync` and `msrsync` using multiple options. Since I'm just creating a huge fake file tree with empty files, you won't see any `msrsync` benefits here, unless you're trying with many many files. They need to be run as root since I'm dropping disk cache between run.
 
 ```
 $ sudo make bench # or sudo msrsync --bench
@@ -82,13 +82,13 @@ msrsync --processes 8 --files 1000 --size 1G took 6.58 seconds (speedup x2.14)
 msrsync --processes 16 --files 1000 --size 1G took 6.66 seconds (speedup x2.11)
 ```
 
-Please test on real data instead =). There is also a *--benchshm* option that will perform the benchmark in */dev/shm*.
+Please test on real data instead =). There is also a `--benchshm` option that will perform the benchmark in `/dev/shm`.
 
 ## Notes
 
-- The *rsync* processes are always run with the *--files-from* and *--from0*, no matter what. *--from0* option affects *--exclude-from*, *--include-from*, *--files-from*, and any merged files specified in a *--filter* rule.
+- The `rsync` processes are always run with the `--files-from` and `--from0`, no matter what. `--from0` option affects `--exclude-from`, `--include-from`, `--files-from`, and any merged files specified in a `--filter` rule.
 
-- This may seem obvious but if the source or the destination of the copy cannot handle parallel I/O well, you won't see any benefits (quite the opposite in fact) using *msrsync*. 
+- This may seem obvious but if the source or the destination of the copy cannot handle parallel I/O well, you won't see any benefits (quite the opposite in fact) using `msrsync`. 
 
 ## Development
 
@@ -108,7 +108,7 @@ Please use `make <target>' where <target> is one of
   benchshm      => run benchmarks using /dev/shm (linux only. Need root to drop buffer cache between run)
 
 ```
-There is an integrated test suite (*--selftest* option, or *make test*). Since I'm using unittest from python 2.6 library, I cannot capture the output of the tests (buffer parameter from TestResult object appeared in 2.7).
+There is an integrated test suite (`--selftest` option, or `make test`). Since I'm using unittest from python 2.6 library, I cannot capture the output of the tests (buffer parameter from TestResult object appeared in 2.7).
 
 ```
 $ make test # or msrsync --selftest
