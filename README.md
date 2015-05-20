@@ -153,7 +153,7 @@ user    2m35.848s
 sys     7m40.623s
 ```
 
-Ridiculous rates due to the size of each file and the I/O overhead (nfs + network), but that's a real use case and we've got nice speedup without to much thinking : just use msrync and you're good to go. That's exactly what I wanted. Here is a summary of the previous
+Ridiculous rates due to the size of each file and the I/O overhead (nfs + network), but that's a real use case and we've got nice speedup without too much thinking : just use msrync and you're good to go. That's exactly what I wanted. Here is a summary of the previous
 results:
 
 | Command       |  Time      | Entries per second   | Bandwidth (MBytes/s) | Speedup |
