@@ -84,6 +84,88 @@ msrsync --processes 16 --files 1000 --size 1G took 6.66 seconds (speedup x2.11)
 
 Please test on real data instead =). There is also a `--benchshm` option that will perform the benchmark in `/dev/shm`.
 
+Here is a real test on a big nas box (not known for handling small files well) on a 1G network (you'll see that is more than useless due to the I/O overhead) with the [linux 4.0.4](https://www.kernel.org/pub/linux/kernel/v4.x/linux-4.0.4.tar.xz) kernel decompressed source 21 times in different folders:
+
+```
+$ ls /mnt/nfs/linux-src/
+0  1  10  11  12  13  14  15  16  17  18  19  2  20  3  4  5  6  7  8  9
+$ du -s --apparent-size --bytes /mnt/nfs/linux-src
+11688149821     /mnt/nfs/linux-src
+$ du -s --apparent-size --human linux-src
+11G     /mnt/nfs/linux-src
+$ find /mnt/nfs/linux-src -type f | wc -l
+1027908
+$ find /mnt/nfs/linux-src -type d | wc -l
+66360
+```
+
+The source and the destination are on an nfs mount.
+
+Let's run `rsync` and `msrsync` with a various number of process:
+
+```
+$ rm -rf /mnt/nfs/dest
+$ echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+$ time rsync -a --numeric-ids /mnt/nfs/linux-src /mnt/nfs/dest
+
+real    136m10.406s
+user    1m54.939s
+sys     7m31.188s
+
+$ rm -rf /mnt/nfs/dest
+$ echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+$ msrsync -p 1 /mnt/nfs/linux-src /mnt/nfs/dest
+
+real    144m8.954s
+user    2m20.426s
+sys     8m4.127s
+
+$ rm -rf /mnt/nfs/dest
+$ echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+$ msrsync -p 2 /mnt/nfs/linux-src /mnt/nfs/dest
+
+real    73m57.312s
+user    2m27.543s
+sys     7m56.484s
+
+$ rm -rf /mnt/nfs/dest
+$ echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+$ msrsync -p 4 /mnt/nfs/linux-src /mnt/nfs/dest
+
+real    42m31.105s
+user    2m24.196s
+sys     7m46.568s
+
+$ rm -rf /mnt/nfs/dest
+$ echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+$ msrsync -p 8 /mnt/nfs/linux-src /mnt/nfs/dest
+
+real    36m55.141s
+user    2m27.149s
+sys     7m40.392s
+
+$ rm -rf /mnt/nfs/dest
+$ echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+$ msrsync -p 16 /mnt/nfs/linux-src /mnt/nfs/dest
+
+real    33m0.976s
+user    2m35.848s
+sys     7m40.623s
+```
+
+Ridiculous rates due to the size of each file and the I/O overhead (nfs + network), but that's a real use case and we've got nice speedup without to much thinking : just use msrync and you're good to go. That's exactly what I wanted. Here is a summary of the previous
+results:
+
+| Command       |  Time      | Entries per second   | Bandwidth (MBytes/s) | Speedup |
+| --------      |:----------:|:--------------------:|:--------------------:|:-------:|
+| rsync         | 136m10s    |       133            |      1.36            |   x1    |
+| msrsync -p 1  | 144m9s     |       126            |      1.28            |   x0.94 |
+| msrsync -p 2  | 73m57s     |       246            |      2.51            |   x1.84 |
+| msrsync -p 4  | 42m31s     |       428            |      4.36            |   x3.20 |
+| msrsync -p 8  | 36m55s     |       494            |      5.03            |   x3.68 |
+| msrsync -p 16 | 33m0s      |       552            |      5.62            |   x4.12 |
+
+
 ## Notes
 
 - The `rsync` processes are always run with the `--files-from` and `--from0`, no matter what. `--from0` option affects `--exclude-from`, `--include-from`, `--files-from`, and any merged files specified in a `--filter` rule.
