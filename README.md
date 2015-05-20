@@ -91,7 +91,7 @@ $ ls /mnt/nfs/linux-src/
 0  1  10  11  12  13  14  15  16  17  18  19  2  20  3  4  5  6  7  8  9
 $ du -s --apparent-size --bytes /mnt/nfs/linux-src
 11688149821     /mnt/nfs/linux-src
-$ du -s --apparent-size --human linux-src
+$ du -s --apparent-size --human /mnt/nfs/linux-src
 11G     /mnt/nfs/linux-src
 $ find /mnt/nfs/linux-src -type f | wc -l
 1027908
