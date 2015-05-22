@@ -52,7 +52,7 @@ r,rsync=       MUST be last option. rsync options as a quoted string ["%s"]. The
  self-test options:
 t,selftest     run the integrated unit and functional tests
 e,bench        run benchmarks
-g,benchshm     run benchmarks in /dev/shm
+g,benchshm     run benchmarks in /dev/shm or the directory in $SHM environment variable
 """ % DEFAULT_RSYNC_OPTIONS
 
 #d,no-compress  do not compress files listings in the buckets directory (compress by default)
@@ -1420,8 +1420,8 @@ def benchshm(total_entries=10000, max_entries_per_level=128, max_depth=5, files_
     Embedded benchmark runner
     """
     try:
-        src = tempfile.mkdtemp(dir="/dev/shm")
-        dst = tempfile.mkdtemp(dir="/dev/shm")
+        src = tempfile.mkdtemp(dir=os.getenv("SHM", "/dev/shm"))
+        dst = tempfile.mkdtemp(dir=os.getenv("SHM", "/dev/shm"))
         bench(total_entries=total_entries, max_entries_per_level=max_entries_per_level, max_depth=max_depth, files_pct=files_pct, src=dst, dst=dst)
     finally:
         if os.path.exists(src):
