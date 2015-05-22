@@ -1325,13 +1325,14 @@ def _check_root(msg=None):
     """ Check if the caller is running under root """
     msg = "Need to be root" if not msg else msg
     if os.geteuid() != 0:
-        print >>sys.stderr, "Need to be root"
-        sys.exit(ENEED_ROOT)
+        print >>sys.stderr, "You're not root. Buffer cache will not be dropped between run. Take the result with caution."
     return True
 
 
 def drop_caches(value=3):
     """ Drop caches using /proc/sys/vm/drop_caches """
+    if os.geteuid() != 0:
+        return
     drop_caches_path = "/proc/sys/vm/drop_caches"
     if os.path.exists(drop_caches_path):
         with open(drop_caches_path, "w") as proc_file:
