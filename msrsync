@@ -1420,8 +1420,14 @@ def benchshm(total_entries=10000, max_entries_per_level=128, max_depth=5, files_
     Embedded benchmark runner
     """
     try:
+        shm = os.getenv("SHM", "/dev/shm")
         src = tempfile.mkdtemp(dir=os.getenv("SHM", "/dev/shm"))
         dst = tempfile.mkdtemp(dir=os.getenv("SHM", "/dev/shm"))
+    except OSError, err:
+        print >>sys.stderr, "Error creating temporary bench directories in %s: %s" % (shm, err)
+        sys.exit(EBENCH)
+
+    try:
         bench(total_entries=total_entries, max_entries_per_level=max_entries_per_level, max_depth=max_depth, files_pct=files_pct, src=dst, dst=dst)
     finally:
         if os.path.exists(src):
