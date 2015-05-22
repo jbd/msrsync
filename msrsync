@@ -1337,6 +1337,8 @@ def drop_caches(value=3):
     if os.path.exists(drop_caches_path):
         with open(drop_caches_path, "w") as proc_file:
             proc_file.write(str(value))
+    else:
+        print >>sys.stderr, "/proc/sys/vm/drop_caches does not exist. Cannot drop buffer cache"
 
 
 def bench(total_entries=10000, max_entries_per_level=128, max_depth=5, files_pct=95, src=None, dst=None):
