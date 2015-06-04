@@ -77,6 +77,7 @@ EDEST_IS_FILE = 22
 EDEST_CREATE = 23
 ENEED_ROOT = 24
 EBENCH = 25
+EMSRSYNC_INTERRUPTED = 26
 
 
 import os
@@ -96,6 +97,7 @@ import itertools
 import random
 import logging
 import unittest
+import signal
 
 # Copy and paste from bup/options.py
 # I'm disabling some pylint warning here
@@ -675,11 +677,12 @@ def consume_queue(jobs_queue):
     """
     Simple helper around a shared queue
     """
-    while True:
-        item = jobs_queue.get()
-        if item is StopIteration:
-            break
-        yield item
+    while not jobs_queue.empty():
+        try:
+            item = jobs_queue.get(block=False)
+            yield item
+        except Queue.Empty:
+            pass
 
 
 # stolen from Forest http://stackoverflow.com/questions/1191374/subprocess-with-timeout
@@ -787,14 +790,10 @@ def rsync_worker(jobs_queue, rsync_opts, dest):
     """
     The queue will contains filenames of file to handle by individual rsync processes
     """
-    try:
-        for src, files_from in consume_queue(jobs_queue):
-            run_rsync(files_from, rsync_opts, src, dest)
-        jobs_queue.put(StopIteration)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        jobs_queue.put(StopIteration)
+
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    for src, files_from in consume_queue(jobs_queue):
+        run_rsync(files_from, rsync_opts, src, dest)
 
 
 def start_rsync_workers(jobs_queue, options, dest):
@@ -831,11 +830,13 @@ def msrsync(options, srcs, dest):
     if options.show:
         print "buckets dir is", options.buckets
 
-    try:
-        manager = multiprocessing.Manager()
-        jobs_queue = manager.Queue() # pylint: disable=no-member
-        rsync_processes = start_rsync_workers(jobs_queue, options, dest)
+    multiprocessing.util.get_logger().setLevel(multiprocessing.util.DEBUG)
 
+    manager = multiprocessing.Manager()
+    jobs_queue = manager.Queue() # pylint: disable=no-member
+    workers = start_rsync_workers(jobs_queue, options, dest)
+
+    try:
         total_size = 0
         for src in srcs:
             # do we want to sync to content of src or src itself ?
@@ -863,17 +864,23 @@ def msrsync(options, srcs, dest):
                     sys.exit(EBUCKET_FILE_CREATE)
                 write_bucket((fileno, filename), bucket, options.compress)
                 jobs_queue.put((src_base, filename))
-        jobs_queue.put(StopIteration)
+
+        for worker in workers:
+            worker.join()
     except KeyboardInterrupt:
-        pass
+        for worker in workers:
+            worker.terminate()
+            worker.join()
+
+        print >>sys.stderr, 'Interrupted'
+        sys.exit(EMSRSYNC_INTERRUPTED)
+        
     except BucketError, err:
         print >>sys.stderr, err
     except Exception: # pylint: disable=broad-except
         print >>sys.stderr, "Uncaught exception:" + os.linesep + traceback.format_exc()
     finally:
-        jobs_queue.put(StopIteration)
-        for proc in rsync_processes:
-            proc.join()
+        print >>sys.stderr, "Remove buckets directory %s", options.buckets
         if options.buckets is not None and not options.keep:
             shutil.rmtree(options.buckets, onerror=rmtree_onerror)
 
@@ -1465,5 +1472,8 @@ def main(cmdline):
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except KeyboardInterrupt:
+        print >>sys.stderr, "Interrupted"
 
