@@ -99,6 +99,8 @@ import logging
 import unittest
 import signal
 
+from multiprocessing.managers import SyncManager
+
 # Copy and paste from bup/options.py
 # I'm disabling some pylint warning here
 
@@ -677,12 +679,11 @@ def consume_queue(jobs_queue):
     """
     Simple helper around a shared queue
     """
-    while not jobs_queue.empty():
-        try:
-            item = jobs_queue.get(block=False)
-            yield item
-        except Queue.Empty:
-            pass
+    while True:
+        item = jobs_queue.get()
+        if item is StopIteration:
+            return
+        yield item
 
 
 # stolen from Forest http://stackoverflow.com/questions/1191374/subprocess-with-timeout
@@ -709,6 +710,14 @@ def run(cmd, timeout_sec=sys.maxsize):
         elapsed = time.time() - starttime
     except OSError, err:
         return -1, "", "Cannot launch %s: %s" % (cmd, err), False, 0
+    except KeyboardInterrupt:
+        if vars().has_key('timer'):
+            timer.cancel()
+        proc.stdout.close()
+        proc.stderr.close()
+        proc.terminate()
+        proc.wait()
+        return 666, "", "Interrupted", False, 0
 
     return proc.returncode, stdout.decode("utf-8", "replace"), stderr.decode("utf-8", "replace"), timeout["value"], elapsed
 
@@ -786,14 +795,19 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
         sys.exit(ERSYNC_JOB)
 
 
+
 def rsync_worker(jobs_queue, rsync_opts, dest):
     """
     The queue will contains filenames of file to handle by individual rsync processes
     """
 
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-    for src, files_from in consume_queue(jobs_queue):
-        run_rsync(files_from, rsync_opts, src, dest)
+    try:
+        for src, files_from in consume_queue(jobs_queue):
+            run_rsync(files_from, rsync_opts, src, dest)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        jobs_queue.put(StopIteration)
 
 
 def start_rsync_workers(jobs_queue, options, dest):
@@ -805,6 +819,12 @@ def start_rsync_workers(jobs_queue, options, dest):
         processes.append(multiprocessing.Process(target=rsync_worker, args=(jobs_queue, options.rsync, dest)))
         processes[-1].start()
     return processes
+
+def multiprocess_mgr_init():
+    """
+    Explicit initializer for SyncManager in msrsync function
+    """
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
 def msrsync(options, srcs, dest):
@@ -830,9 +850,8 @@ def msrsync(options, srcs, dest):
     if options.show:
         print "buckets dir is", options.buckets
 
-    multiprocessing.util.get_logger().setLevel(multiprocessing.util.DEBUG)
-
-    manager = multiprocessing.Manager()
+    manager = SyncManager()
+    manager.start(multiprocess_mgr_init)
     jobs_queue = manager.Queue() # pylint: disable=no-member
     workers = start_rsync_workers(jobs_queue, options, dest)
 
@@ -865,22 +884,21 @@ def msrsync(options, srcs, dest):
                 write_bucket((fileno, filename), bucket, options.compress)
                 jobs_queue.put((src_base, filename))
 
+        jobs_queue.put(StopIteration)
+
         for worker in workers:
             worker.join()
+
     except KeyboardInterrupt:
         for worker in workers:
             worker.terminate()
             worker.join()
-
-        print >>sys.stderr, 'Interrupted'
-        sys.exit(EMSRSYNC_INTERRUPTED)
-        
     except BucketError, err:
         print >>sys.stderr, err
     except Exception: # pylint: disable=broad-except
         print >>sys.stderr, "Uncaught exception:" + os.linesep + traceback.format_exc()
     finally:
-        print >>sys.stderr, "Remove buckets directory %s", options.buckets
+        manager.shutdown()
         if options.buckets is not None and not options.keep:
             shutil.rmtree(options.buckets, onerror=rmtree_onerror)
 
@@ -1356,6 +1374,8 @@ def bench(total_entries=10000, max_entries_per_level=128, max_depth=5, files_pct
     def _run_or_die(cmd):
         """ helper """
         ret, _, stderr, timeout, elapsed = run(cmd, timeout_sec=900)
+        if ret == 666:
+            sys.exit(EMSRSYNC_INTERRUPTED)
         if ret != 0 or timeout:
             print >>sys.stderr, "Problem running %s, aborting benchmark: %s" % (cmd, stderr)
             sys.exit(EBENCH)
@@ -1475,5 +1495,5 @@ if __name__ == '__main__':
     try:
         main(sys.argv)
     except KeyboardInterrupt:
-        print >>sys.stderr, "Interrupted"
+        pass
 
