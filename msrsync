@@ -851,7 +851,8 @@ def msrsync(options, srcs, dest):
         print "buckets dir is", options.buckets
 
     manager = SyncManager()
-    manager.start(multiprocess_mgr_init)
+    #manager.start(multiprocess_mgr_init) # Oups... This is in python 2.7...
+    manager.start()
     jobs_queue = manager.Queue() # pylint: disable=no-member
     workers = start_rsync_workers(jobs_queue, options, dest)
 
