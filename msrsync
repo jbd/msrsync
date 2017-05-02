@@ -10,6 +10,8 @@
 # This file includes a copy of the BSD licensed options.py file from the bup project
 # See https://github.com/bup/bup/blob/master/lib/bup/options.py
 
+VERSION='20170502'
+
 """
 Simple program from a very specific need. I needed to transfer multiple
 terabytes of data using rsync. I can use multiple rsync in parallel to
@@ -49,6 +51,7 @@ k,keep         do not remove buckets directory at the end
 j,show         show bucket directory
 P,progress     show progress
 d,dry-run      do not run rsync processes
+v,version      print version
  rsync options:
 r,rsync=       MUST be last option. rsync options as a quoted string ["%s"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
  self-test options:
@@ -636,7 +639,7 @@ def parse_cmdline(cmdline_argv):
     else:
         # no --rsync options marker on the command line.
         (opt, _, extra) = options.parse(cmdline_argv[1:])
-        if opt.selftest or opt.bench or opt.benchshm: # early exit
+        if opt.selftest or opt.bench or opt.benchshm or opt.version: # early exit
             return opt, [], ""
         opt.rsync = opt.r = DEFAULT_RSYNC_OPTIONS # pylint: disable=attribute-defined-outside-init
         if not extra or len(extra) < 2:
