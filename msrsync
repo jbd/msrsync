@@ -47,6 +47,8 @@ s,size=        limit partitions to BYTES size (1024 suffixes: K, M, G, T, P, E, 
 b,buckets=     where to put the buckets files (default: auto temporary directory)
 k,keep         do not remove buckets directory at the end
 j,show         show bucket directory
+P,progress     show progress
+d,dry-run      do not run rsync processes
  rsync options:
 r,rsync=       MUST be last option. rsync options as a quoted string ["%s"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
  self-test options:
@@ -460,6 +462,13 @@ class QueueHandler(logging.Handler): # pragma: no cover
 # pylint: enable=protected-access, superfluous-parens, pointless-string-statement, too-many-branches
 # pylint: enable=too-many-statements, broad-except
 
+def print_update(data):
+    """
+    Print 'data' on the same line as before
+    """
+    sys.stdout.write("\r\x1b[K"+data.__str__())
+    sys.stdout.flush()
+
 
 class BucketError(RuntimeError):
     """
@@ -796,29 +805,66 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
 
 
 
-def rsync_worker(jobs_queue, rsync_opts, dest):
+def rsync_worker(jobs_queue, results_queue, options, dest):
     """
     The queue will contains filenames of file to handle by individual rsync processes
     """
 
     try:
-        for src, files_from in consume_queue(jobs_queue):
-            run_rsync(files_from, rsync_opts, src, dest)
+        for src, files_from, bucket_files_nr, bucket_size in consume_queue(jobs_queue):
+            if not options.dry_run:
+                run_rsync(files_from, options.rsync, src, dest)
+            rsync_result = { "size": bucket_size, "files_nr": bucket_files_nr }
+            results_queue.put(rsync_result)
     except KeyboardInterrupt:
         pass
     finally:
         jobs_queue.put(StopIteration)
+        results_queue.put(StopIteration)
+
+def progress_worker(results_queue, total_size, total_files_nr, options):
+    """
+    This queue will contains the results of individual rsync process
+    """
+
+    current_size = 0
+    current_files_nr = 0
+
+    try:
+        for result in consume_queue(results_queue):
+            current_size += result["size"]
+            current_files_nr += result["files_nr"]
+            print_update("[%d/%d] %s/%s" % \
+                         (current_files_nr,\
+                          total_files_nr.value,\
+                          get_human_size(current_size),\
+                          get_human_size(total_size.value)))
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        print >>sys.stdout, ''
+        results_queue.put(StopIteration)
 
 
-def start_rsync_workers(jobs_queue, options, dest):
+def start_rsync_workers(jobs_queue, results_queue, options, dest):
     """
     Helper to start rsync processes
     """
     processes = []
     for _ in xrange(options.processes):
-        processes.append(multiprocessing.Process(target=rsync_worker, args=(jobs_queue, options.rsync, dest)))
+        processes.append(multiprocessing.Process(target=rsync_worker, args=(jobs_queue, results_queue, options, dest)))
         processes[-1].start()
     return processes
+
+def start_progress_worker(results_queue, total_size, total_files_nr, options):
+    """
+    Helper to start progress process
+    """
+    proc = multiprocessing.Process(target=progress_worker, args=(results_queue, total_size, total_files_nr, options))
+    proc.start()
+    return proc
+
 
 def multiprocess_mgr_init():
     """
@@ -853,11 +899,17 @@ def msrsync(options, srcs, dest):
     manager = SyncManager()
     #manager.start(multiprocess_mgr_init) # Oups... This is in python 2.7...
     manager.start()
+    total_size = manager.Value('i', 0)
+    total_files_nr = manager.Value('i', 0)
     jobs_queue = manager.Queue() # pylint: disable=no-member
-    workers = start_rsync_workers(jobs_queue, options, dest)
+    results_queue = manager.Queue() # pylint: disable=no-member
+    rsync_workers = start_rsync_workers(jobs_queue, results_queue, options, dest)
+
+    if options.progress:
+        progress_worker = start_progress_worker(results_queue, total_size, total_files_nr, options)
 
     try:
-        total_size = 0
+        total_size.value = 0
         for src in srcs:
             # do we want to sync to content of src or src itself ?
             # os.path.split("/home/jbdenis/Code")[0] will return '/home/jbdenis'
@@ -866,7 +918,8 @@ def msrsync(options, srcs, dest):
             # that will be used on the rsync command line
             src_base = os.path.split(src)[0]
             for bucket_files_nr, bucket_size, bucket in buckets(src, options.files, options.s):
-                total_size += bucket_size
+                total_size.value += bucket_size
+                total_files_nr.value += bucket_files_nr
                 # from the rsync man page (--files-from part) :
                 # NOTE: sorting the list of files in the --files-from input
                 # helps rsync to be more efficient, as it will avoid re-visiting
@@ -883,17 +936,23 @@ def msrsync(options, srcs, dest):
                     print >>sys.stderr, 'Cannot create temporary bucket file: "%s"' % err
                     sys.exit(EBUCKET_FILE_CREATE)
                 write_bucket((fileno, filename), bucket, options.compress)
-                jobs_queue.put((src_base, filename))
+                jobs_queue.put((src_base, filename, bucket_files_nr, bucket_size))
 
         jobs_queue.put(StopIteration)
 
-        for worker in workers:
+        for worker in rsync_workers:
             worker.join()
 
+        if options.progress:
+            progress_worker.join()
+
     except KeyboardInterrupt:
-        for worker in workers:
+        for worker in rsync_workers:
             worker.terminate()
             worker.join()
+        if options.progress:
+            progress_worker.terminate()
+            progress_worker.join()
     except BucketError, err:
         print >>sys.stderr, err
     except Exception: # pylint: disable=broad-except
@@ -1316,6 +1375,14 @@ class TestSyncCLI(unittest.TestCase):
         """ test simple msrsync synchronisation """
         self._msrsync_test_helper()
 
+    def test_simple_msrsync_progress_cli(self):
+        """ test simple msrsync synchronisation """
+        self._msrsync_test_helper(options='--progress')
+
+    def test_msrsync_progress_cli_2_processes(self):
+        """ test simple msrsync synchronisation """
+        self._msrsync_test_helper(options='--progress -p 2')
+
     def test_msrsync_cli_2_processes(self):
         """ test simple msrsync synchronisation """
         self._msrsync_test_helper(options='-p 2')
@@ -1452,8 +1519,8 @@ def benchshm(total_entries=10000, max_entries_per_level=128, max_depth=5, files_
     """
     try:
         shm = os.getenv("SHM", "/dev/shm")
-        src = tempfile.mkdtemp(dir=os.getenv("SHM", "/dev/shm"))
-        dst = tempfile.mkdtemp(dir=os.getenv("SHM", "/dev/shm"))
+        src = tempfile.mkdtemp(dir=shm)
+        dst = tempfile.mkdtemp(dir=shm)
     except OSError, err:
         print >>sys.stderr, "Error creating temporary bench directories in %s: %s" % (shm, err)
         sys.exit(EBENCH)
