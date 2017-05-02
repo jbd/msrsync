@@ -35,7 +35,6 @@ of data already. See https://github.com/martymac/fpart
 # - handle remote-shell src or dest dir, like a normal rsync
 # - verbose, debug, multiprocessing compliant output
 
-
 DEFAULT_RSYNC_OPTIONS = "-a --numeric-ids"
 
 MSRSYNC_OPTSPEC = """
@@ -103,6 +102,20 @@ import random
 import logging
 import unittest
 import signal
+
+
+# Use the built-in version of scandir/walk if possible, otherwise
+# use the scandir module version
+
+USING_SCANDIR = True
+
+try:
+    if sys.version_info < (3, 5):
+            from scandir import walk
+            os.walk = walk
+except ImportError:
+    USING_SCANDIR = False
+    pass
 
 from multiprocessing.managers import SyncManager
 
@@ -1543,6 +1556,13 @@ def main(cmdline):
     """
     _check_python_version()
     options, srcs, dest = parse_cmdline(cmdline)
+
+    if options.version:
+        if USING_SCANDIR:
+            print >>sys.stdout, "%s" % VERSION
+        else:
+            print >>sys.stdout, "%s (no scandir optimization. Use python 3.5+ or install the scandir module)" % VERSION
+        sys.exit(0)
 
     if options.selftest:
         selftest()
