@@ -820,18 +820,30 @@ def rsync_worker(jobs_queue, results_queue, options, dest):
         pass
     finally:
         jobs_queue.put(StopIteration)
-        results_queue.put(StopIteration)
+        # we insert a sentinel value
+        results_queue.put({ "size": -1, "files_nr": -1 })
 
-def progress_worker(results_queue, total_size, total_files_nr, options):
+def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_nr, options):
     """
     This queue will contains the results of individual rsync process
     """
 
     current_size = 0
     current_files_nr = 0
+    rsync_workers_stops = 0
 
     try:
         for result in consume_queue(results_queue):
+            # check for the sentinel value
+            # meaning that one worker has finished what
+            # it had to do
+            if result["size"] == -1:
+                rsync_workers_stops += 1
+                # check if every rsync workers have finished
+                if rsync_workers_stops == nb_rsync_processes:
+                    break
+                else:
+                    continue
             current_size += result["size"]
             current_files_nr += result["files_nr"]
             print_update("[%d/%d] %s/%s" % \
@@ -857,11 +869,11 @@ def start_rsync_workers(jobs_queue, results_queue, options, dest):
         processes[-1].start()
     return processes
 
-def start_progress_worker(results_queue, total_size, total_files_nr, options):
+def start_progress_worker(results_queue, nb_rsync_processes, total_size, total_files_nr, options):
     """
     Helper to start progress process
     """
-    proc = multiprocessing.Process(target=progress_worker, args=(results_queue, total_size, total_files_nr, options))
+    proc = multiprocessing.Process(target=progress_worker, args=(results_queue, nb_rsync_processes, total_size, total_files_nr, options))
     proc.start()
     return proc
 
@@ -906,7 +918,7 @@ def msrsync(options, srcs, dest):
     rsync_workers = start_rsync_workers(jobs_queue, results_queue, options, dest)
 
     if options.progress:
-        progress_worker = start_progress_worker(results_queue, total_size, total_files_nr, options)
+        progress_worker = start_progress_worker(results_queue, options.processes, total_size, total_files_nr, options)
 
     try:
         total_size.value = 0
