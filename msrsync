@@ -10,7 +10,7 @@
 # This file includes a copy of the BSD licensed options.py file from the bup project
 # See https://github.com/bup/bup/blob/master/lib/bup/options.py
 
-VERSION='20170727'
+VERSION = '20170727'
 
 """
 Simple program from a very specific need. I needed to transfer multiple
@@ -114,8 +114,8 @@ USING_SCANDIR = True
 
 try:
     if sys.version_info < (3, 5):
-            from scandir import walk
-            os.walk = walk
+        from scandir import walk
+        os.walk = walk
 except ImportError:
     USING_SCANDIR = False
     pass
@@ -836,7 +836,7 @@ def rsync_worker(jobs_queue, results_queue, options, dest):
             elapsed = 0
             if not options.dry_run:
                 ret, elapsed = run_rsync(files_from, options.rsync, src, dest)
-            rsync_result = { "size": bucket_size, "files_nr": bucket_files_nr, "elapsed": elapsed }
+            rsync_result = {"size": bucket_size, "files_nr": bucket_files_nr, "elapsed": elapsed}
             if options.progress or options.stats:
                 results_queue.put(rsync_result)
     except KeyboardInterrupt:
@@ -845,7 +845,7 @@ def rsync_worker(jobs_queue, results_queue, options, dest):
         jobs_queue.put(StopIteration)
         # we insert a sentinel value
         if options.progress or options.stats:
-            results_queue.put({ "size": -1, "files_nr": -1 })
+            results_queue.put({"size": -1, "files_nr": -1})
 
 
 def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_nr, options):
@@ -974,7 +974,7 @@ def msrsync(options, srcs, dest):
     rsync_workers = start_rsync_workers(jobs_queue, results_queue, options, dest)
 
     if options.progress or options.stats:
-        progress_worker = start_progress_worker(results_queue, options.processes, total_size, total_files_nr, options)
+        progress_worker_proc = start_progress_worker(results_queue, options.processes, total_size, total_files_nr, options)
 
     try:
         total_size.value = 0
@@ -1011,16 +1011,16 @@ def msrsync(options, srcs, dest):
         for worker in rsync_workers:
             worker.join()
 
-        if options.progress:
-            progress_worker.join()
+        if options.progress or options.stats:
+            progress_worker_proc.join()
 
     except KeyboardInterrupt:
         for worker in rsync_workers:
             worker.terminate()
             worker.join()
         if options.progress:
-            progress_worker.terminate()
-            progress_worker.join()
+            progress_worker_proc.terminate()
+            progress_worker_proc.join()
     except BucketError, err:
         print >>sys.stderr, err
     except Exception: # pylint: disable=broad-except
@@ -1639,4 +1639,3 @@ if __name__ == '__main__':
         main(sys.argv)
     except KeyboardInterrupt:
         pass
-
