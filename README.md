@@ -176,7 +176,7 @@ results:
 | msrsync -p 16 | 33m0s      |       552            |      5.62            |   x4.12 |
 
 
-## Notes
+## Notes
 
 - The `rsync` processes are always run with the `--files-from` and `--from0`, no matter what. `--from0` option affects `--exclude-from`, `--include-from`, `--files-from`, and any merged files specified in a `--filter` rule.
 
