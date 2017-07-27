@@ -24,7 +24,7 @@ That's why the only dependencies of msrsync are [python](https://www.python.org/
 
 [python](python) >= 2.6 and [rsync](https://rsync.samba.org/)
 
-## Installation
+## Installation
 
 `msrsync` is a single python file, you just have to download it. Or if you prefer, you can clone the repository and use the provided Makefile:
 
@@ -36,7 +36,7 @@ or
 $ git clone https://github.com/jbd/msrsync && cd msrsync && sudo make install
 ```
 
-## Usage
+## Usage
 
 ```
 $ msrsync --help
