@@ -50,21 +50,31 @@ msrsync options:
     -b, --buckets ...     where to put the buckets files (default: auto temporary directory)
     -k, --keep            do not remove buckets directory at the end
     -j, --show            show bucket directory
+    -P, --progress        show progress
+    -d, --dry-run         do not run rsync processes
 
 rsync options:
-    -r, --rsync ...       MUST be last option. rsync options as a quoted string ["-a --numeric-ids"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync `from/filter files if you want to use them. See rsync(1) manpage for
-                            details.
+    -r, --rsync ...       MUST be last option. rsync options as a quoted string ["-a --numeric-ids"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
 
 self-test options:
     -t, --selftest        run the integrated unit and functional tests
     -e, --bench           run benchmarks
-    -g, --benchshm        run benchmarks in /dev/shm
+    -g, --benchshm        run benchmarks in /dev/shm or the directory in $SHM environment variable
 ```
 
-If you want to use specific options for the rsync processes, use the `--rsync` option:
+If you want to use specific options for the rsync processes, use the `--rsync` option.
 
 ```bash
 $ msrsync -p4 --rsync "-a --numeric-ids --inplace" source destination
+```
+
+Some examples:
+```
+$ msrsync -p 8 /usr/share/doc/ /tmp/doc/
+```
+```
+$ msrsync -P -p 8 /usr/share/doc/ /tmp/doc/
+[12324/12324] 204.6 M/204.6 M
 ```
 
 ## Performance
