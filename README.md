@@ -79,7 +79,7 @@ $ msrsync -P -p 8 /usr/share/doc/ /tmp/doc/
 
 ## Performance
 
-You can launch a benchmark using the `--bench` option or `make test`. It is only for testing purpose. They are comparing the performance between vanilla `rsync` and `msrsync` using multiple options. Since I'm just creating a huge fake file tree with empty files, you won't see any `msrsync` benefits here, unless you're trying with many many files. They need to be run as root since I'm dropping disk cache between run.
+You can launch a benchmark using the `--bench` option or `make bench`. It is only for testing purpose. They are comparing the performance between vanilla `rsync` and `msrsync` using multiple options. Since I'm just creating a huge fake file tree with empty files, you won't see any `msrsync` benefits here, unless you're trying with many many files. They need to be run as root since I'm dropping disk cache between run.
 
 ```
 $ sudo make bench # or sudo msrsync --bench
