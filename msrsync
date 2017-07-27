@@ -870,6 +870,7 @@ def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_n
 
             current_size += result["size"]
             current_files_nr += result["files_nr"]
+            current_elapsed += result["elapsed"]
 
             if current_elapsed > 0:
                 bytes_per_second = current_size / current_elapsed
