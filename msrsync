@@ -51,6 +51,7 @@ b,buckets=     where to put the buckets files (default: auto temporary directory
 k,keep         do not remove buckets directory at the end
 j,show         show bucket directory
 P,progress     show progress
+stats          show additional stats
 d,dry-run      do not run rsync processes
 v,version      print version
  rsync options:
@@ -836,13 +837,15 @@ def rsync_worker(jobs_queue, results_queue, options, dest):
             if not options.dry_run:
                 ret, elapsed = run_rsync(files_from, options.rsync, src, dest)
             rsync_result = { "size": bucket_size, "files_nr": bucket_files_nr, "elapsed": elapsed }
-            results_queue.put(rsync_result)
+            if options.progress or options.stats:
+                results_queue.put(rsync_result)
     except KeyboardInterrupt:
         pass
     finally:
         jobs_queue.put(StopIteration)
         # we insert a sentinel value
-        results_queue.put({ "size": -1, "files_nr": -1 })
+        if options.progress or options.stats:
+            results_queue.put({ "size": -1, "files_nr": -1 })
 
 
 def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_nr, options):
@@ -854,6 +857,7 @@ def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_n
     current_files_nr = 0
     current_elapsed = 0
     rsync_workers_stops = 0
+    buckets_nr = 0
 
     try:
         for result in consume_queue(results_queue):
@@ -868,6 +872,7 @@ def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_n
                 else:
                     continue
 
+            buckets_nr += 1
             current_size += result["size"]
             current_files_nr += result["files_nr"]
             current_elapsed += result["elapsed"]
@@ -882,13 +887,26 @@ def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_n
             else:
                 entries_per_second = 0
 
-            print_update("[%d/%d] %s/%s %d entries/s %s/s" % \
-                         (current_files_nr,\
-                          total_files_nr.value,\
-                          get_human_size(current_size),\
-                          get_human_size(total_size.value),\
-                          entries_per_second,\
-                          get_human_size(bytes_per_second)))
+            if options.progress:
+                print_update("[%d/%d] %s/%s %d entries/s %s/s" % \
+                              (current_files_nr,\
+                               total_files_nr.value,\
+                               get_human_size(current_size),\
+                               get_human_size(total_size.value),\
+                               entries_per_second,\
+                               get_human_size(bytes_per_second)))
+
+        if options.stats:
+            print os.linesep
+            print "Total size: %s" % get_human_size(total_size.value)
+            print "Total entries: %s" % total_files_nr.value
+            print "Buckets number: %d" % buckets_nr
+            if buckets_nr > 0:
+                print "Mean entries per bucket: %d" % ((total_files_nr.value * 1.)/ buckets_nr)
+                print "Mean size per bucket: %s" % get_human_size((total_size.value * 1.)/ buckets_nr)
+            print "Total rsync's processes runtime: %.1fs" % current_elapsed
+            print "Entries per second: %d" % entries_per_second
+            print "Speed: %s/s" % get_human_size(bytes_per_second)
 
     except KeyboardInterrupt:
         pass
@@ -955,7 +973,7 @@ def msrsync(options, srcs, dest):
     results_queue = manager.Queue() # pylint: disable=no-member
     rsync_workers = start_rsync_workers(jobs_queue, results_queue, options, dest)
 
-    if options.progress:
+    if options.progress or options.stats:
         progress_worker = start_progress_worker(results_queue, options.processes, total_size, total_files_nr, options)
 
     try:
