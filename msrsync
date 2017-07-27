@@ -34,6 +34,8 @@ of data already. See https://github.com/martymac/fpart
 # - rsync log summary
 # - handle remote-shell src or dest dir, like a normal rsync
 # - verbose, debug, multiprocessing compliant output
+# - buckets files should be written in a tree hierarchy to avoid to much files
+#   inside a single directory
 
 DEFAULT_RSYNC_OPTIONS = "-a --numeric-ids"
 
@@ -631,7 +633,7 @@ def parse_cmdline(cmdline_argv):
 
     # If I want to run this script on RHEL6 and derivatives without installing any dependencies
     # except python and rsync, I can't rely on argparse which is only available in python >= 2.7
-    # standard library. I don't want to rely on the installation of pyton-argparse for python 2.6
+    # standard library. I don't want to rely on the installation of python-argparse for python 2.6
     options = Options(MSRSYNC_OPTSPEC)
 
     # it looks soooo fragile, but it works for me here.
@@ -808,7 +810,7 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
     # except the error message
     rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--from0 --files-from=%s" % files_from, src, dest)
     try:
-        ret, _, stderr, timeout, _ = run(rsync_cmd, timeout) # this should not take more than one minute =)
+        ret, _, stderr, timeout, elapsed = run(rsync_cmd, timeout) # this should not take more than one minute =)
         if timeout:
             print >>sys.stderr, '''Error during rsync command "%s": took too long !''' % rsync_cmd
             sys.exit(ERSYNC_TOO_LONG)
@@ -819,6 +821,8 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
         print >>sys.stderr, '''Error during rsync command "%s": %s''' % (rsync_cmd, 2*os.linesep + err)
         sys.exit(ERSYNC_JOB)
 
+    return ret, elapsed
+
 
 
 def rsync_worker(jobs_queue, results_queue, options, dest):
@@ -828,9 +832,10 @@ def rsync_worker(jobs_queue, results_queue, options, dest):
 
     try:
         for src, files_from, bucket_files_nr, bucket_size in consume_queue(jobs_queue):
+            elapsed = 0
             if not options.dry_run:
-                run_rsync(files_from, options.rsync, src, dest)
-            rsync_result = { "size": bucket_size, "files_nr": bucket_files_nr }
+                ret, elapsed = run_rsync(files_from, options.rsync, src, dest)
+            rsync_result = { "size": bucket_size, "files_nr": bucket_files_nr, "elapsed": elapsed }
             results_queue.put(rsync_result)
     except KeyboardInterrupt:
         pass
@@ -845,16 +850,31 @@ def progress_worker(results_queue, total_size, total_files_nr, options):
 
     current_size = 0
     current_files_nr = 0
+    current_elapsed = 0
 
     try:
         for result in consume_queue(results_queue):
+            current_elapsed += result["elapsed"]
             current_size += result["size"]
             current_files_nr += result["files_nr"]
-            print_update("[%d/%d] %s/%s" % \
+
+            if current_elapsed > 0:
+                bytes_per_second = current_size / current_elapsed
+            else:
+                bytes_per_second = 0
+
+            if current_size > 0:
+                entries_per_second = current_files_nr / current_elapsed
+            else:
+                entries_per_second = 0
+
+            print_update("[%d/%d] %s/%s %d entries/s %s/s" % \
                          (current_files_nr,\
                           total_files_nr.value,\
                           get_human_size(current_size),\
-                          get_human_size(total_size.value)))
+                          get_human_size(total_size.value),\
+                          entries_per_second,\
+                          get_human_size(bytes_per_second)))
 
     except KeyboardInterrupt:
         pass
