@@ -182,7 +182,7 @@ results:
 
 - This may seem obvious but if the source or the destination of the copy cannot handle parallel I/O well, you won't see any benefits (quite the opposite in fact) using `msrsync`. 
 
-- If one rsync fails, everything else will also fails. I need to log that and continue.
+- If one rsync fails, everything else will also fails. I need to log that and continue. Look for `sys.;exit` call in `run_rsync` function.
 
 ## Development
 
