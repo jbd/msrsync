@@ -967,6 +967,7 @@ def msrsync(options, srcs, dest):
             if not os.access(options.buckets, os.W_OK):
                 print >>sys.stderr, options.buckets, "bucket directory is not writable."
                 sys.exit(EBUCKET_DIR_PERMS)
+            options.buckets = tempfile.mkdtemp(prefix="msrsync-", dir=options.buckets)
     except OSError, err:
         print >>sys.stderr, '''Error with bucket directory creation: "%s"''' % err
         sys.exit(EBUCKET_DIR_OSERROR)
