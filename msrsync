@@ -836,7 +836,7 @@ def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_fi
             buckets_nr += 1
             current_size += result["size"]
             current_files_nr += result["files_nr"]
-            current_elapsed += result["elapsed"]
+            current_elapsed += result["elapsed"] / nb_rsync_processes # this is rough
 
             if current_elapsed > 0:
                 bytes_per_second = current_size / current_elapsed
