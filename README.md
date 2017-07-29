@@ -58,10 +58,13 @@ msrsync options:
     -k, --keep            do not remove buckets directory at the end
     -j, --show            show bucket directory
     -P, --progress        show progress
+    --stats               show additional stats
     -d, --dry-run         do not run rsync processes
+    -v, --version         print version
 
 rsync options:
-    -r, --rsync ...       MUST be last option. rsync options as a quoted string ["-a --numeric-ids"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
+    -r, --rsync ...       MUST be last option. rsync options as a quoted string ["-a --numeric-ids"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync
+                            *from/filter files if you want to use them. See rsync(1) manpage for details.
 
 self-test options:
     -t, --selftest        run the integrated unit and functional tests
@@ -81,7 +84,23 @@ $ msrsync -p 8 /usr/share/doc/ /tmp/doc/
 ```
 ```
 $ msrsync -P -p 8 /usr/share/doc/ /tmp/doc/
-[12324/12324] 204.6 M/204.6 M
+[33491/33491 entries] [602.1 M/602.1 M transferred] [754 entries/s] [13.6 M/s bw] [monq 1] [jq 1]
+```
+```
+$ msrsync --stats -P -p 2 /usr/share/doc/ /tmp/doc/
+[33491/33491 entries] [602.1 M/602.1 M transferred] [2305 entries/s] [41.4 M/s bw] [monq 1] [jq 1]
+
+Total size: 602.1 M
+Total entries: 33491
+Buckets number: 34
+Mean entries per bucket: 985
+Mean size per bucket: 17.7 M
+Entries per second: 2305
+Speed: 41.4 M/s
+Rsync workers: 2
+Total rsync's processes (34) cumulative runtime: 14.5s
+Crawl time: 0.3s (4.7% of total runtime)
+Total time: 7.4s
 ```
 
 ## Performance
