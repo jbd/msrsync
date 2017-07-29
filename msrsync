@@ -85,6 +85,13 @@ ENEED_ROOT = 24
 EBENCH = 25
 EMSRSYNC_INTERRUPTED = 26
 
+TYPE_RSYNC = 0
+TYPE_RSYNC_SENTINEL = 1
+MSG_STDERR = 10
+MSG_STDOUT = 11
+MSG_PROGRESS = 12
+
+# pylint: disable=wrong-import-position
 
 import os
 import sys
@@ -104,7 +111,19 @@ import random
 import logging
 import unittest
 import signal
+import timeit
 
+STDOUT_ENCODING = sys.stdout.encoding if None else 'utf8'
+
+def _e(value):
+    # pylint: disable=invalid-name
+    """
+    dirty helper
+    """
+    if type(value) is unicode:
+        return value.encode(STDOUT_ENCODING)
+    else:
+        return value
 
 # Use the built-in version of scandir/walk if possible, otherwise
 # use the scandir module version
@@ -117,14 +136,15 @@ try:
         os.walk = walk
 except ImportError:
     USING_SCANDIR = False
-    pass
 
 from multiprocessing.managers import SyncManager
+
+G_MESSAGES_QUEUE = None
 
 # Copy and paste from bup/options.py
 # I'm disabling some pylint warning here
 
-# pylint: disable=bad-whitespace, bad-continuation, unused-variable, invalid-name
+# pylint: disable=bad-whitespace, bad-continuation, unused-variable, invalid-name, wrong-import-position
 # pylint: disable=reimported, missing-docstring, too-few-public-methods, unused-argument
 # pylint: disable=too-many-instance-attributes, old-style-class, too-many-locals, multiple-statements
 # pylint: disable=protected-access, superfluous-parens, pointless-string-statement, too-many-branches
@@ -409,76 +429,18 @@ class Options: # pragma: no cover
             opt[k] = _invert(v, invert)
         return (opt,flags,extra)
 
-# straight from python3.4/logging/handlers.py
-class QueueHandler(logging.Handler): # pragma: no cover
-    """
-    This handler sends events to a queue. Typically, it would be used together
-    with a multiprocessing Queue to centralise logging to file in one process
-    (in a multi-process application), so as to avoid file write contention
-    between processes.
-
-    This code is new in Python 3.2, but this class can be copy pasted into
-    user code for use with earlier Python versions.
-    """
-
-    def __init__(self, queue):
-        """
-        Initialise an instance, using the passed queue.
-        """
-        logging.Handler.__init__(self)
-        self.queue = queue
-
-    def enqueue(self, record):
-        """
-        Enqueue a record.
-
-        The base implementation uses put_nowait. You may want to override
-        this method if you want to use blocking, timeouts or custom queue
-        implementations.
-        """
-        self.queue.put_nowait(record)
-
-    def prepare(self, record):
-        """
-        Prepares a record for queuing. The object returned by this method is
-        enqueued.
-
-        The base implementation formats the record to merge the message
-        and arguments, and removes unpickleable items from the record
-        in-place.
-
-        You might want to override this method if you want to convert
-        the record to a dict or JSON string, or send a modified copy
-        of the record while leaving the original intact.
-        """
-        # The format operation gets traceback text into record.exc_text
-        # (if there's exception data), and also puts the message into
-        # record.message. We can then use this to replace the original
-        # msg + args, as these might be unpickleable. We also zap the
-        # exc_info attribute, as it's no longer needed and, if not None,
-        # will typically not be pickleable.
-        self.format(record)
-        record.msg = record.message
-        record.args = None
-        record.exc_info = None
-        return record
-
-    def emit(self, record):
-        """
-        Emit a record.
-
-        Writes the LogRecord to the queue, preparing it for pickling first.
-        """
-        try:
-            self.enqueue(self.prepare(record))
-        except Exception:
-            self.handleError(record)
-
 # pylint: enable=bad-whitespace, bad-continuation, unused-variable, invalid-name
 # pylint: enable=reimported, missing-docstring, too-few-public-methods, unused-argument
 # pylint: enable=too-many-instance-attributes, old-style-class, too-many-locals, multiple-statements
 # pylint: enable=protected-access, superfluous-parens, pointless-string-statement, too-many-branches
 # pylint: enable=too-many-statements, broad-except
+
+def print_message(message, output=MSG_STDOUT):
+    """
+    Add message to the message queue
+    """
+    G_MESSAGES_QUEUE.put({"type": output, "message": message})
+
 
 def print_update(data):
     """
@@ -563,7 +525,7 @@ def crawl(path, relative=False):
         """
         helper
         """
-        print >>sys.stderr, oserror
+        print_message("msrsync crawl: %s" % oserror, MSG_STDERR)
 
     root_size = len(path) if relative else 0
 
@@ -661,7 +623,7 @@ def parse_cmdline(cmdline_argv):
             options.fatal('You must provide a source and a destination')
         srcs, dest = extra[:-1], extra[-1]
 
-    size = human_size(opt.size)
+    size = human_size(str(opt.size))
     if not size:
         options.fatal("'%s' does not look like a valid size value" % opt.size)
     try:
@@ -724,15 +686,21 @@ def kill_proc(proc, timeout):
 
 
 # stolen and adapted from Forest http://stackoverflow.com/questions/1191374/subprocess-with-timeout
-def run(cmd, timeout_sec=sys.maxsize):
+def run(cmd, capture_stdout=False, capture_stderr=False, timeout_sec=sys.maxsize):
     """ run function with a timeout """
     try:
-        proc = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout_p = subprocess.PIPE if capture_stdout else None
+        stderr_p = subprocess.PIPE if capture_stderr else None
+        proc = subprocess.Popen(shlex.split(cmd), stdout=stdout_p, stderr=stderr_p)
         timeout = {"value": False}
         timer = threading.Timer(timeout_sec, kill_proc, [proc, timeout])
         starttime = time.time()
         timer.start()
         stdout, stderr = proc.communicate()
+        if stdout is None:
+            stdout = ""
+        if stderr is None:
+            stderr = ""
         timer.cancel()
         elapsed = time.time() - starttime
     except OSError, err:
@@ -781,7 +749,7 @@ def _check_rsync_options(options):
         src = tempfile.mkdtemp()
         dst = tempfile.mkdtemp()
         rsync_cmd = "%s %s %s %s" % (RSYNC_EXE, options + ' --from0', src + os.sep, dst)
-        ret, _, stderr, timeout, _ = run(rsync_cmd, 60) # this should not take more than one minute =)
+        ret, _, stderr, timeout, _ = run(rsync_cmd, timeout_sec=60) # this should not take more than one minute =)
         if timeout:
             print >>sys.stderr, '''Error during rsync options check command "%s": took more than 60 seconds !''' % rsync_cmd
             sys.exit(ERSYNC_OPTIONS_CHECK)
@@ -810,12 +778,12 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
     # except the error message
     rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--from0 --files-from=%s" % files_from, src, dest)
     try:
-        ret, _, stderr, timeout, elapsed = run(rsync_cmd, timeout) # this should not take more than one minute =)
+        ret, _, _, timeout, elapsed = run(rsync_cmd, timeout_sec=timeout) # this should not take more than one minute =)
         if timeout:
             print >>sys.stderr, '''Error during rsync command "%s": took too long !''' % rsync_cmd
             sys.exit(ERSYNC_TOO_LONG)
         elif ret != 0:
-            print >>sys.stderr, '''Error during rsync command "%s": %s''' % (rsync_cmd, 2*os.linesep + stderr)
+            print >>sys.stderr, '''Error during rsync command "%s": %s''' % (rsync_cmd, 2*os.linesep)
             sys.exit(ERSYNC_JOB)
     except OSError, err:
         print >>sys.stderr, '''Error during rsync command "%s": %s''' % (rsync_cmd, 2*os.linesep + err)
@@ -824,8 +792,7 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
     return ret, elapsed
 
 
-
-def rsync_worker(jobs_queue, results_queue, options, dest):
+def rsync_worker(jobs_queue, monitor_queue, options, dest):
     """
     The queue will contains filenames of file to handle by individual rsync processes
     """
@@ -833,25 +800,23 @@ def rsync_worker(jobs_queue, results_queue, options, dest):
     try:
         for src, files_from, bucket_files_nr, bucket_size in consume_queue(jobs_queue):
             elapsed = 0
+            ret = 0
             if not options.dry_run:
                 ret, elapsed = run_rsync(files_from, options.rsync, src, dest)
-            rsync_result = {"size": bucket_size, "files_nr": bucket_files_nr, "elapsed": elapsed}
-            if options.progress or options.stats:
-                results_queue.put(rsync_result)
+            rsync_result = {"type": TYPE_RSYNC, "rcode": ret, "size": bucket_size, "files_nr": bucket_files_nr, "elapsed": elapsed, "jq_size": jobs_queue.qsize()}
+            monitor_queue.put(rsync_result)
     except KeyboardInterrupt:
         pass
     finally:
         jobs_queue.put(StopIteration)
-        # we insert a sentinel value
-        if options.progress or options.stats:
-            results_queue.put({"size": -1, "files_nr": -1})
+        # we insert a sentinel value to inform the monitor this process fnished
+        monitor_queue.put({"type": TYPE_RSYNC_SENTINEL, "pid": os.getpid()})
 
 
-def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_nr, options):
+def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_files_nr, crawl_time, total_time, options):
     """
-    This queue will contains the results of individual rsync process
+    The monitor queue contains messages from the rsync workers
     """
-
     current_size = 0
     current_files_nr = 0
     current_elapsed = 0
@@ -859,17 +824,14 @@ def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_n
     buckets_nr = 0
 
     try:
-        for result in consume_queue(results_queue):
-            # check for the sentinel value
-            # meaning that one worker has finished what
-            # it had to do
-            if result["size"] == -1:
+        for result in consume_queue(monitor_queue):
+            if result["type"] == TYPE_RSYNC_SENTINEL:
+                # not needed, but we keep it for now
                 rsync_workers_stops += 1
-                # check if every rsync workers have finished
-                if rsync_workers_stops == nb_rsync_processes:
-                    break
-                else:
-                    continue
+                continue
+            if result["type"] != TYPE_RSYNC:
+                print_message("rsync_monitor_worker process received an incompatile type message: %s" % result, MSG_STDERR)
+                continue
 
             buckets_nr += 1
             current_size += result["size"]
@@ -887,48 +849,93 @@ def progress_worker(results_queue, nb_rsync_processes, total_size, total_files_n
                 entries_per_second = 0
 
             if options.progress:
-                print_update("[%d/%d] %s/%s %d entries/s %s/s" % \
+                print_message("[%d/%d entries] [%s/%s transferred] [%d entries/s] [%s/s bw] [monq %d] [jq %d]" % \
                               (current_files_nr,\
                                total_files_nr.value,\
                                get_human_size(current_size),\
                                get_human_size(total_size.value),\
                                entries_per_second,\
-                               get_human_size(bytes_per_second)))
+                               get_human_size(bytes_per_second),\
+                               monitor_queue.qsize(),\
+                               result["jq_size"]),\
+                               MSG_PROGRESS)
 
         if options.stats:
-            print os.linesep
-            print "Total size: %s" % get_human_size(total_size.value)
-            print "Total entries: %s" % total_files_nr.value
-            print "Buckets number: %d" % buckets_nr
+            msg = os.linesep +\
+                  "Total size: %s" % get_human_size(total_size.value) + os.linesep +\
+                  "Total entries: %s" % total_files_nr.value + os.linesep +\
+                  "Buckets number: %d" % buckets_nr + os.linesep
             if buckets_nr > 0:
-                print "Mean entries per bucket: %d" % ((total_files_nr.value * 1.)/ buckets_nr)
-                print "Mean size per bucket: %s" % get_human_size((total_size.value * 1.)/ buckets_nr)
-            print "Total rsync's processes runtime: %.1fs" % current_elapsed
-            print "Entries per second: %d" % entries_per_second
-            print "Speed: %s/s" % get_human_size(bytes_per_second)
+                msg += "Mean entries per bucket: %d" % ((total_files_nr.value * 1.)/ buckets_nr) + os.linesep +\
+                       "Mean size per bucket: %s" % get_human_size((total_size.value * 1.)/ buckets_nr) + os.linesep
+            msg += "Entries per second: %d" % entries_per_second + os.linesep +\
+                   "Speed: %s/s" % get_human_size(bytes_per_second) + os.linesep +\
+                   "Rsync workers: %d" % nb_rsync_processes + os.linesep +\
+                   "Total rsync's processes (%d) cumulative runtime: %.1fs" % (buckets_nr, current_elapsed) + os.linesep +\
+		   "Crawl time: %.1fs (%.1f%% of total runtime)" % (crawl_time.value, 100* crawl_time.value/total_time.value) + os.linesep +\
+		   "Total time: %.1fs" % total_time.value
+            print_message(msg, MSG_STDOUT)
+
+    except KeyboardInterrupt:
+        pass
+
+
+def messages_worker(options):
+    """
+    This queue will contains messages to be print of the screen
+    """
+
+    last_msg_type = None
+    try:
+        for result in consume_queue(G_MESSAGES_QUEUE):
+            if last_msg_type == MSG_PROGRESS:
+                newline = os.linesep
+            else:
+                newline = ''
+
+            cur_msg_type = result["type"]
+
+            if cur_msg_type == MSG_PROGRESS:
+                print_update(result["message"])
+            elif cur_msg_type == MSG_STDOUT:
+                print >>sys.stdout, _e(newline + result["message"])
+            elif cur_msg_type == MSG_STDERR:
+                print >>sys.stderr, _e(newline + result["message"])
+            else:
+                print >>sys.stderr, _e("Unknown message type '%s': %s" % (cur_msg_type, result))
+            last_msg_type = cur_msg_type
 
     except KeyboardInterrupt:
         pass
     finally:
         print >>sys.stdout, ''
-        results_queue.put(StopIteration)
 
 
-def start_rsync_workers(jobs_queue, results_queue, options, dest):
+def start_rsync_workers(jobs_queue, monitor_queue, options, dest):
     """
     Helper to start rsync processes
     """
     processes = []
     for _ in xrange(options.processes):
-        processes.append(multiprocessing.Process(target=rsync_worker, args=(jobs_queue, results_queue, options, dest)))
+        processes.append(multiprocessing.Process(target=rsync_worker, args=(jobs_queue, monitor_queue, options, dest)))
         processes[-1].start()
     return processes
 
-def start_progress_worker(results_queue, nb_rsync_processes, total_size, total_files_nr, options):
+
+def start_rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_files_nr, crawl_time, total_time, options):
     """
-    Helper to start progress process
+    Helper to start rsync monitor process
     """
-    proc = multiprocessing.Process(target=progress_worker, args=(results_queue, nb_rsync_processes, total_size, total_files_nr, options))
+    proc = multiprocessing.Process(target=rsync_monitor_worker, args=(monitor_queue, nb_rsync_processes, total_size, total_files_nr, crawl_time, total_time, options))
+    proc.start()
+    return proc
+
+
+def start_messages_worker(options):
+    """
+    Helper to start messages process
+    """
+    proc = multiprocessing.Process(target=messages_worker, args=(options,))
     proc.start()
     return proc
 
@@ -945,6 +952,7 @@ def msrsync(options, srcs, dest):
     multi-stream rsync reusable function
     It will copy srcs directories to dest honoring the options structure
     """
+    global G_MESSAGES_QUEUE
     # pylint: disable=too-many-branches, too-many-locals
     try:
         if not options.buckets:
@@ -966,17 +974,25 @@ def msrsync(options, srcs, dest):
     manager = SyncManager()
     #manager.start(multiprocess_mgr_init) # Oups... This is in python 2.7...
     manager.start()
+
     total_size = manager.Value('i', 0)
     total_files_nr = manager.Value('i', 0)
-    jobs_queue = manager.Queue() # pylint: disable=no-member
-    results_queue = manager.Queue() # pylint: disable=no-member
-    rsync_workers = start_rsync_workers(jobs_queue, results_queue, options, dest)
+    crawl_time = manager.Value('f', 0)
+    total_time = manager.Value('f', 0)
 
-    if options.progress or options.stats:
-        progress_worker_proc = start_progress_worker(results_queue, options.processes, total_size, total_files_nr, options)
+    monitor_queue = manager.Queue() # pylint: disable=no-member
+    jobs_queue = manager.Queue() # pylint: disable=no-member
+    G_MESSAGES_QUEUE = manager.Queue() # pylint: disable=no-member
+
+    rsync_workers_procs = start_rsync_workers(jobs_queue, monitor_queue, options, dest)
+    rsync_monitor_worker_proc = start_rsync_monitor_worker(monitor_queue, options.processes, total_size, total_files_nr, crawl_time, total_time, options)
+    messages_worker_proc = start_messages_worker(options)
+
+    crawl_start = timeit.default_timer()
 
     try:
         total_size.value = 0
+        bucket_nr = 0
         for src in srcs:
             # do we want to sync to content of src or src itself ?
             # os.path.split("/home/jbdenis/Code")[0] will return '/home/jbdenis'
@@ -987,7 +1003,7 @@ def msrsync(options, srcs, dest):
             for bucket_files_nr, bucket_size, bucket in buckets(src, options.files, options.s):
                 total_size.value += bucket_size
                 total_files_nr.value += bucket_files_nr
-                # from the rsync man page (--files-from part) :
+                # from the rsync man page (--files-from part):
                 # NOTE: sorting the list of files in the --files-from input
                 # helps rsync to be more efficient, as it will avoid re-visiting
                 # the path elements that are shared  between  adjacent
@@ -996,30 +1012,52 @@ def msrsync(options, srcs, dest):
                 # and rsync will eventually unduplicate them after they
                 # get turned into file-list elements.
                 bucket.sort()
-                # the fd is closed within write_bucket
+                # the idea is prevent to have too much files in a single directory
+                d1s = str(bucket_nr / 1024).zfill(8)
+                # with bucket_nr == 12, d1s == i'00000000'
+                # tdir = options.buckets/0000/0000
+                # with bucket_nr == 11058, d1s == '00000100'
+                # tdir = options.buckets/0000/0012
+                # with bucket_nr == 148472185, d1s == '00144992' (148472181/1024)
+                # tdir = options.buckets/0014/4992
                 try:
-                    fileno, filename = tempfile.mkstemp(dir=options.buckets)
+                    tdir = os.path.join(options.buckets, d1s[:4], d1s[4:])
+                    if not os.path.exists(tdir):
+                        os.makedirs(tdir)
+                    # the fd is closed within write_bucket
+                    fileno, filename = tempfile.mkstemp(dir=tdir)
                 except OSError, err:
-                    print >>sys.stderr, 'Cannot create temporary bucket file: "%s"' % err
-                    sys.exit(EBUCKET_FILE_CREATE)
+                    print_message('msrsync scan: cannot create temporary bucket file: "%s"' % err, MSG_STDERR)
+                    continue
                 write_bucket((fileno, filename), bucket, options.compress)
+                bucket_nr += 1
                 jobs_queue.put((src_base, filename, bucket_files_nr, bucket_size))
+
+	crawl_time.value = timeit.default_timer() - crawl_start
 
         jobs_queue.put(StopIteration)
 
-        for worker in rsync_workers:
+        for worker in rsync_workers_procs:
             worker.join()
 
-        if options.progress or options.stats:
-            progress_worker_proc.join()
+	total_time.value = timeit.default_timer() - crawl_start
+
+        monitor_queue.put(StopIteration)
+        rsync_monitor_worker_proc.join()
+
+        G_MESSAGES_QUEUE.put(StopIteration)
+        messages_worker_proc.join()
 
     except KeyboardInterrupt:
-        for worker in rsync_workers:
+        for worker in rsync_workers_procs:
             worker.terminate()
             worker.join()
-        if options.progress:
-            progress_worker_proc.terminate()
-            progress_worker_proc.join()
+
+        rsync_monitor_worker_proc.terminate()
+        rsync_monitor_worker_proc.join()
+
+        messages_worker_proc.terminate()
+        messages_worker_proc.join()
     except BucketError, err:
         print >>sys.stderr, err
     except Exception: # pylint: disable=broad-except
