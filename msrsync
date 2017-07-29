@@ -905,7 +905,7 @@ def messages_worker(options):
             elif cur_msg_type == MSG_STDERR:
                 print >>sys.stderr, _e(newline + result["message"])
             else:
-                print >>sys.stderr, _e("Unknown message type '%s': %s" % (cur_msg_type, result))
+                print >>sys.stderr, _e(newline + "Unknown message type '%s': %s" % (cur_msg_type, result))
             last_msg_type = cur_msg_type
 
     except KeyboardInterrupt:
