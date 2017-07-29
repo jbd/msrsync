@@ -12,13 +12,20 @@ $ msrsync -p 4 /source /destination
 
 This will copy /source directory in the /destination directory (same behaviour as `rsync` regarding the slash handling) using 4 `rsync` processes (using `"-a --numeric-ids"` as default option. Could be override with `--rsync` option). `msrsync` will split the files and directory list into bucket of 1G or 1000 files maximum (see `--size` and `--files` options) before feeding them to each `rsync` process in parallel using the `--files-from` option. As long as the source and the destination can cope with the parallel I/O (think big boring "enterprise grade" NAS), it should be faster than a single `rsync`.
 
-> `msrsync` shares the same spirit as [fpart](https://github.com/martymac/fpart) (and its [fpsync](https://github.com/martymac/fpart/blob/master/tools/fpsync) associated tool) by Ganaël Laplanche or [parsync](http://moo.nac.uci.edu/~hjm/parsync/) by Harry Mangalam. Those are two fantastic much more complete tools used in the field to do real work. Please check them out, they might be what you're looking for.
+> `msrsync` shares the same spirit as [fpart](https://github.com/martymac/fpart) (and its [fpsync](https://github.com/martymac/fpart/blob/master/tools/fpsync) associated tool) by [Ganaël Laplanche](https://github.com/martymac) or [parsync](http://moo.nac.uci.edu/~hjm/parsync/) by [Harry Mangalam](https://github.com/hjmangalam). Those are two fantastic much more complete tools used in the field to do real work. Please check them out, they might be what you're looking for.
 
 ## Motivation
 
-Why write `msrsync` if tools like [fpart](https://github.com/martymac/fpart) and [parsync](http://moo.nac.uci.edu/~hjm/parsync/) exist ? While reasonable, their dependencies can be a point of friction given the constraints we can have on a given system. When you're lucky, you can use your package manager ([fpart](https://github.com/martymac/fpart) seems to be well supported among various GNU/Linux and FreeBSD distribution: [FreeBSD](http://www.freshports.org/sysutils/fpart), [Debian](http://packages.debian.org/fpart), [Ubuntu](http://packages.ubuntu.com/fpart), [Archlinux](https://aur.archlinux.org/packages/fpart/), [OBS](https://build.opensuse.org/package/show/home:mgoppold/fpart)) to deal with the requirements but more often than not, I found myself struggling with the sad state of the machine I'm working with.
+Why write `msrsync` if tools like [fpart](https://github.com/martymac/fpart), [parsync](http://moo.nac.uci.edu/~hjm/parsync/) or [pftool](https://github.com/pftool/pftool) exist ? While reasonable, their dependencies can be a point of friction given the constraints we can have on a given system. When you're lucky, you can use your package manager ([fpart](https://github.com/martymac/fpart) seems to be well supported among various GNU/Linux and FreeBSD distribution: [FreeBSD](http://www.freshports.org/sysutils/fpart), [Debian](http://packages.debian.org/fpart), [Ubuntu](http://packages.ubuntu.com/fpart), [Archlinux](https://aur.archlinux.org/packages/fpart/), [OBS](https://build.opensuse.org/package/show/home:mgoppold/fpart)) to deal with the requirements but more often than not, I found myself struggling with the sad state of the machine I'm working with.
 
 That's why the only dependencies of msrsync are [python](https://www.python.org/) >=2.6 and [rsync](https://rsync.samba.org/). What python 2.6 ? I'm aiming RHEL6 like distribution as a minimum requirement here, so I'm stuck with python 2.6. I miss some cool features, but that's part of the project.
+
+The devil is in the details. If you need a starting point to think about data migration, this overview by Jeff Layton about is very informative: [Moving Your Data – It’s Not Always Pleasant](http://www.admin-magazine.com/HPC/Articles/Moving-Your-Data-It-s-Not-Always-Pleasant).
+
+If you can read french, I co-wrote an article with [Ganaël Laplanche](https://github.com/martymac) about [fpart](https://github.com/martymac/fpart) : [Parallélisez vos transferts de fichiers](http://connect.ed-diamond.com/GNU-Linux-Magazine/GLMF-164/Parallelisez-vos-transferts-de-fichiers).
+
+You might be also interested by this Intel whitepaper on data migration : [Data Migration with
+Intel® Enterprise Edition for Lustre* Software](http://www.intel.com/content/dam/www/public/us/en/documents/white-papers/data-migration-enterprise-edition-for-lustre-software-white-paper.pdf) which mentions all of those tools (but not `msrsync`).
 
 ## Requirements
 
@@ -180,7 +187,7 @@ results:
 
 - The `rsync` processes are always run with the `--files-from` and `--from0`, no matter what. `--from0` option affects `--exclude-from`, `--include-from`, `--files-from`, and any merged files specified in a `--filter` rule.
 
-- This may seem obvious but if the source or the destination of the copy cannot handle parallel I/O well, you won't see any benefits (quite the opposite in fact) using `msrsync`. 
+- This may seem obvious but if the source or the destination of the copy cannot handle parallel I/O well, you won't see any benefits (quite the opposite in fact) using `msrsync`.
 
 - If one rsync fails, everything else will also fails. I need to log that and continue. Look for `sys.exit` call in `run_rsync` function.
 
