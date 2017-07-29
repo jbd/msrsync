@@ -62,7 +62,6 @@ e,bench        run benchmarks
 g,benchshm     run benchmarks in /dev/shm or the directory in $SHM environment variable
 """ % DEFAULT_RSYNC_OPTIONS
 
-#d,no-compress  do not compress files listings in the buckets directory (compress by default)
 
 RSYNC_EXE = None
 
