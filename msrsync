@@ -820,10 +820,12 @@ def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_fi
     current_size = 0
     current_files_nr = 0
     current_elapsed = 0
+    rsync_runtime = 0
     rsync_workers_stops = 0
     buckets_nr = 0
 
     try:
+        start = timeit.default_timer()
         for result in consume_queue(monitor_queue):
             if result["type"] == TYPE_RSYNC_SENTINEL:
                 # not needed, but we keep it for now
@@ -836,7 +838,8 @@ def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_fi
             buckets_nr += 1
             current_size += result["size"]
             current_files_nr += result["files_nr"]
-            current_elapsed += result["elapsed"] / nb_rsync_processes # this is rough
+            rsync_runtime += result["elapsed"]
+            current_elapsed = timeit.default_timer() - start
 
             if current_elapsed > 0:
                 bytes_per_second = current_size / current_elapsed
@@ -871,7 +874,7 @@ def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_fi
             msg += "Entries per second: %d" % entries_per_second + os.linesep +\
                    "Speed: %s/s" % get_human_size(bytes_per_second) + os.linesep +\
                    "Rsync workers: %d" % nb_rsync_processes + os.linesep +\
-                   "Total rsync's processes (%d) cumulative runtime: %.1fs" % (buckets_nr, current_elapsed) + os.linesep +\
+                   "Total rsync's processes (%d) cumulative runtime: %.1fs" % (buckets_nr, rsync_runtime) + os.linesep +\
 		   "Crawl time: %.1fs (%.1f%% of total runtime)" % (crawl_time.value, 100* crawl_time.value/total_time.value) + os.linesep +\
 		   "Total time: %.1fs" % total_time.value
             print_message(msg, MSG_STDOUT)
