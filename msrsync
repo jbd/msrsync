@@ -708,10 +708,13 @@ def run(cmd, capture_stdout=False, capture_stderr=False, timeout_sec=sys.maxsize
     except KeyboardInterrupt:
         if vars().has_key('timer'):
             timer.cancel()
-        proc.stdout.close()
-        proc.stderr.close()
-        proc.terminate()
-        proc.wait()
+        if proc:
+            if proc.stdout:
+                proc.stdout.close()
+            if proc.stderr:
+                proc.stderr.close()
+            proc.terminate()
+            proc.wait()
         return 666, "", "Interrupted", False, 0
 
     return proc.returncode, stdout.decode("utf-8", "replace"), stderr.decode("utf-8", "replace"), timeout["value"], elapsed
