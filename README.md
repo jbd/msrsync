@@ -22,6 +22,8 @@ That's why the only dependencies of msrsync are [python](https://www.python.org/
 
 The devil is in the details. If you need a starting point to think about data migration, this overview by Jeff Layton about is very informative: [Moving Your Data – It’s Not Always Pleasant](http://www.admin-magazine.com/HPC/Articles/Moving-Your-Data-It-s-Not-Always-Pleasant).
 
+The "How to transfer large amounts of data via network(http://moo.nac.uci.edu/~hjm/HOWTO_move_data.html)" by `parsync` author is updated regularly and its worth a read also.
+
 If you can read french, I co-wrote an article with [Ganaël Laplanche](https://github.com/martymac) about [fpart](https://github.com/martymac/fpart) : [Parallélisez vos transferts de fichiers](http://connect.ed-diamond.com/GNU-Linux-Magazine/GLMF-164/Parallelisez-vos-transferts-de-fichiers).
 
 You might be also interested by this Intel whitepaper on data migration : [Data Migration with
@@ -203,7 +205,7 @@ results:
 | msrsync -p 8  | 36m55s     |       494            |      5.03            |   x3.68 |
 | msrsync -p 16 | 33m0s      |       552            |      5.62            |   x4.12 |
 
-Astute readers will notify the slight overhead of `msrync` over the equivalent `rsync` in the single process case. This overhead vanishes (but still exists) when you increase processes number. 
+Astute readers will notify the slight overhead of `msrync` over the equivalent `rsync` in the single process case. This overhead vanishes (but still exists) when you increase processes number.
 
 ## Notes
 
