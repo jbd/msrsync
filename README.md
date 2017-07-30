@@ -206,7 +206,7 @@ results:
 
 ## Notes
 
-- The `rsync` processes are always run with the `--files-from` and `--from0`, no matter what. `--from0` option affects `--exclude-from`, `--include-from`, `--files-from`, and any merged files specified in a `--filter` rule.
+- The `rsync` processes are always run with the `--from0 --files-from=... --quiet --verbose --stats --log-file=...` options, no matter what. `--from0` option affects `--exclude-from`, `--include-from`, `--files-from`, and any merged files specified in a `--filter` rule.
 
 - This may seem obvious but if the source or the destination of the copy cannot handle parallel I/O well, you won't see any benefits (quite the opposite in fact) using `msrsync`.
 
