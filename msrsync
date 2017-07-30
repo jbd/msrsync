@@ -109,7 +109,6 @@ import subprocess
 import threading
 import itertools
 import random
-import logging
 import unittest
 import signal
 import timeit
