@@ -79,11 +79,12 @@ EDEST_NOT_DIR = 18
 ERSYNC_OPTIONS_CHECK = 19
 ERSYNC_TOO_LONG = 20
 ERSYNC_JOB = 21
-EDEST_IS_FILE = 22
-EDEST_CREATE = 23
-ENEED_ROOT = 24
-EBENCH = 25
-EMSRSYNC_INTERRUPTED = 26
+ERSYNC_OK = 22
+EDEST_IS_FILE = 23
+EDEST_CREATE = 24
+ENEED_ROOT = 25
+EBENCH = 26
+EMSRSYNC_INTERRUPTED = 27
 
 TYPE_RSYNC = 0
 TYPE_RSYNC_SENTINEL = 1
@@ -748,7 +749,8 @@ def _check_rsync_options(options):
     try:
         src = tempfile.mkdtemp()
         dst = tempfile.mkdtemp()
-        rsync_cmd = "%s %s %s %s" % (RSYNC_EXE, options + ' --from0', src + os.sep, dst)
+        rsync_log_fd, rsync_log = tempfile.mkstemp()
+        rsync_cmd = "%s %s %s %s" % (RSYNC_EXE, options + ' --quiet --stats --verbose --from0 --log-file %s' % rsync_log, src + os.sep, dst)
         ret, _, stderr, timeout, _ = run(rsync_cmd, timeout_sec=60) # this should not take more than one minute =)
         if timeout:
             print >>sys.stderr, '''Error during rsync options check command "%s": took more than 60 seconds !''' % rsync_cmd
@@ -766,6 +768,8 @@ def _check_rsync_options(options):
         try:
             os.rmdir(src)
             os.rmdir(dst)
+            os.close(rsync_log_fd)
+            os.remove(rsync_log)
         except OSError:
             pass
 
@@ -776,20 +780,32 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
     """
     # this looks very close to the _check_rsync_options function...
     # except the error message
-    rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--from0 --files-from=%s" % files_from, src, dest)
-    try:
-        ret, _, _, timeout, elapsed = run(rsync_cmd, timeout_sec=timeout) # this should not take more than one minute =)
-        if timeout:
-            print >>sys.stderr, '''Error during rsync command "%s": took too long !''' % rsync_cmd
-            sys.exit(ERSYNC_TOO_LONG)
-        elif ret != 0:
-            print >>sys.stderr, '''Error during rsync command "%s": %s''' % (rsync_cmd, 2*os.linesep)
-            sys.exit(ERSYNC_JOB)
-    except OSError, err:
-        print >>sys.stderr, '''Error during rsync command "%s": %s''' % (rsync_cmd, 2*os.linesep + err)
-        sys.exit(ERSYNC_JOB)
+    rsync_log = files_from + '.log'
+    rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --verbose --stats --from0 --files-from=%s --log-file %s" % (files_from, rsync_log), src, dest)
+    #rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --from0 --files-from=%s" % (files_from,), src, dest)
 
-    return ret, elapsed
+    rsync_result = dict()
+    rsync_result["rcode"] = -1
+    rsync_result["msg"] = None
+    rsync_result["cmdline"] = rsync_cmd
+    rsync_result["log"] = rsync_log
+
+    try:
+        ret, _, _, timeout, elapsed = run(rsync_cmd, timeout_sec=timeout)
+
+        rsync_result["rcode"] = ret
+        rsync_result["elapsed"] = elapsed
+
+        if timeout:
+            rsync_result["errcode"] = ERSYNC_TOO_LONG
+        elif ret != 0:
+            rsync_result["errcode"] = ERSYNC_JOB
+
+    except OSError, err:
+        rsync_result["errcode"] = ERSYNC_JOB
+        rsync_result["msg"] = str(err)
+
+    return rsync_result
 
 
 def rsync_worker(jobs_queue, monitor_queue, options, dest):
@@ -799,18 +815,33 @@ def rsync_worker(jobs_queue, monitor_queue, options, dest):
 
     try:
         for src, files_from, bucket_files_nr, bucket_size in consume_queue(jobs_queue):
-            elapsed = 0
-            ret = 0
             if not options.dry_run:
-                ret, elapsed = run_rsync(files_from, options.rsync, src, dest)
-            rsync_result = {"type": TYPE_RSYNC, "rcode": ret, "size": bucket_size, "files_nr": bucket_files_nr, "elapsed": elapsed, "jq_size": jobs_queue.qsize()}
-            monitor_queue.put(rsync_result)
+                rsync_result = run_rsync(files_from, options.rsync, src, dest)
+            rsync_mon_result = {"type": TYPE_RSYNC, "rsync_result": rsync_result, "size": bucket_size, "files_nr": bucket_files_nr, "jq_size": jobs_queue.qsize()}
+            monitor_queue.put(rsync_mon_result)
     except KeyboardInterrupt:
         pass
     finally:
         jobs_queue.put(StopIteration)
         # we insert a sentinel value to inform the monitor this process fnished
         monitor_queue.put({"type": TYPE_RSYNC_SENTINEL, "pid": os.getpid()})
+
+
+def handle_rsync_error_result(rsync_result):
+    """"
+    Helper
+    """
+    msg = ''
+
+    if rsync_result["msg"] is not None:
+        msg = rsync_result["msg"]
+
+    if rsync_result["errcode"] == ERSYNC_TOO_LONG:
+        print_message(("rsync command took too long and has been killed (see '%s' rsync log file): %s\n" + rsync_result["cmdline"]) % (rsync_result["log"], msg), MSG_STDERR)
+    elif rsync_result["errcode"] == ERSYNC_JOB:
+        print_message(("errors during rsync command (see '%s' rsync log file): %s\n" + rsync_result["cmdline"]) % (rsync_result["log"], msg), MSG_STDERR)
+    else:
+        print_message("unknown rsync_result status: %s" % rsync_result, MSG_STDERR)
 
 
 def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_files_nr, crawl_time, total_time, options):
@@ -823,6 +854,9 @@ def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_fi
     rsync_runtime = 0
     rsync_workers_stops = 0
     buckets_nr = 0
+    rsync_errors = 0
+    entries_per_second = 0
+    bytes_per_second = 0
 
     try:
         start = timeit.default_timer()
@@ -835,10 +869,17 @@ def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_fi
                 print_message("rsync_monitor_worker process received an incompatile type message: %s" % result, MSG_STDERR)
                 continue
 
+            rsync_result = result["rsync_result"]
+
+            if rsync_result["rcode"] != 0:
+                rsync_errors += 1
+                handle_rsync_error_result(rsync_result)
+                continue
+
             buckets_nr += 1
             current_size += result["size"]
             current_files_nr += result["files_nr"]
-            rsync_runtime += result["elapsed"]
+            rsync_runtime += result["rsync_result"]["elapsed"]
             current_elapsed = timeit.default_timer() - start
 
             if current_elapsed > 0:
@@ -863,21 +904,23 @@ def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_fi
                                result["jq_size"]),\
                                MSG_PROGRESS)
 
-        if options.stats:
-            msg = os.linesep +\
-                  "Total size: %s" % get_human_size(total_size.value) + os.linesep +\
-                  "Total entries: %s" % total_files_nr.value + os.linesep +\
-                  "Buckets number: %d" % buckets_nr + os.linesep
-            if buckets_nr > 0:
-                msg += "Mean entries per bucket: %d" % ((total_files_nr.value * 1.)/ buckets_nr) + os.linesep +\
-                       "Mean size per bucket: %s" % get_human_size((total_size.value * 1.)/ buckets_nr) + os.linesep
-            msg += "Entries per second: %d" % entries_per_second + os.linesep +\
-                   "Speed: %s/s" % get_human_size(bytes_per_second) + os.linesep +\
-                   "Rsync workers: %d" % nb_rsync_processes + os.linesep +\
-                   "Total rsync's processes (%d) cumulative runtime: %.1fs" % (buckets_nr, rsync_runtime) + os.linesep +\
-		   "Crawl time: %.1fs (%.1f%% of total runtime)" % (crawl_time.value, 100* crawl_time.value/total_time.value) + os.linesep +\
-		   "Total time: %.1fs" % total_time.value
-            print_message(msg, MSG_STDOUT)
+
+        if rsync_errors > 0:
+            print_message("\nmsrsync error: somes files/attr were not transferred (see previous errors)", MSG_STDERR)
+
+        stats = dict()
+        stats["errors"] = rsync_errors
+        stats["total_size"] = total_size.value
+        stats["total_entries"] = total_files_nr.value
+        stats["buckets_nr"] = buckets_nr
+        stats["bytes_per_second"] = bytes_per_second
+        stats["entries_per_second"] = entries_per_second
+        stats["rsync_workers"] = nb_rsync_processes
+        stats["rsync_runtime"] = rsync_runtime
+        stats["crawl_time"] = crawl_time.value
+        stats["total_time"] = total_time.value
+
+        monitor_queue.put(stats)
 
     except KeyboardInterrupt:
         pass
@@ -911,7 +954,10 @@ def messages_worker(options):
     except KeyboardInterrupt:
         pass
     finally:
-        print >>sys.stdout, ''
+        if last_msg_type == MSG_PROGRESS:
+            print >>sys.stdout, os.linesep
+            print >>sys.stderr, os.linesep
+
 
 
 def start_rsync_workers(jobs_queue, monitor_queue, options, dest):
@@ -948,6 +994,35 @@ def multiprocess_mgr_init():
     Explicit initializer for SyncManager in msrsync function
     """
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+def show_stats(msrsync_stat):
+    """
+    Show the stats from msrsync run
+    """
+    s = msrsync_stat
+    if s["errors"] == 0:
+        status = "SUCCESS"
+    else:
+        status = "FAILURE, %d rsync processe(s) had errors" % s["errors"]
+
+    print "Status:", status
+    print "Working directory:", os.getcwd()
+    print "Command line:", " ".join(sys.argv)
+    print "Total size: %s" % get_human_size(s["total_size"])
+    print "Total entries: %s" % s["total_entries"]
+    buckets_nr = s["buckets_nr"]
+    print "Buckets number: %d" % buckets_nr
+    if buckets_nr > 0:
+        print "Mean entries per bucket: %d" % ((s["total_entries"] * 1.)/ buckets_nr)
+        print "Mean size per bucket: %s" % get_human_size((s["total_size"] * 1.)/ buckets_nr)
+
+    print "Entries per second: %d" % s["entries_per_second"]
+    print "Speed: %s/s" % get_human_size(s["bytes_per_second"])
+    print "Rsync workers: %d" % s["rsync_workers"]
+    print "Total rsync's processes (%d) cumulative runtime: %.1fs" % (buckets_nr, s["rsync_runtime"])
+    print "Crawl time: %.1fs (%.1f%% of total runtime)" % (s["crawl_time"], 100* s["crawl_time"]/s["total_time"])
+    print "Total time: %.1fs" % s["total_time"]
 
 
 def msrsync(options, srcs, dest):
@@ -1037,20 +1112,27 @@ def msrsync(options, srcs, dest):
                 bucket_nr += 1
                 jobs_queue.put((src_base, filename, bucket_files_nr, bucket_size))
 
-	crawl_time.value = timeit.default_timer() - crawl_start
+        crawl_time.value = timeit.default_timer() - crawl_start
 
         jobs_queue.put(StopIteration)
 
         for worker in rsync_workers_procs:
             worker.join()
 
-	total_time.value = timeit.default_timer() - crawl_start
+        total_time.value = timeit.default_timer() - crawl_start
 
         monitor_queue.put(StopIteration)
         rsync_monitor_worker_proc.join()
 
         G_MESSAGES_QUEUE.put(StopIteration)
         messages_worker_proc.join()
+
+        # we retrieve the last element from the queue, which is a stats dict
+        run_stats = monitor_queue.get()
+        if options.stats:
+            show_stats(run_stats)
+
+        return run_stats["errors"]
 
     except KeyboardInterrupt:
         for worker in rsync_workers_procs:
@@ -1400,6 +1482,7 @@ class TestRsyncOptionsChecker(unittest.TestCase):
 
         self.fail("Should have raised a SystemExit exception")
 
+
 class TestSyncAPI(unittest.TestCase):
     """
     Test msrsync by directly calling python function
@@ -1672,11 +1755,11 @@ def main(cmdline):
     _check_executables()
     _check_srcs_dest(srcs, dest)
     _check_rsync_options(options.rsync)
-    msrsync(options, srcs, dest)
+    return msrsync(options, srcs, dest)
 
 
 if __name__ == '__main__':
     try:
-        main(sys.argv)
+        sys.exit(main(sys.argv))
     except KeyboardInterrupt:
         pass
