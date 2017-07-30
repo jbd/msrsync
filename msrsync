@@ -821,7 +821,7 @@ def rsync_worker(jobs_queue, monitor_queue, options, dest):
                 rsync_result = run_rsync(files_from, options.rsync, src, dest)
             rsync_mon_result = {"type": TYPE_RSYNC, "rsync_result": rsync_result, "size": bucket_size, "files_nr": bucket_files_nr, "jq_size": jobs_queue.qsize()}
             monitor_queue.put(rsync_mon_result)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
     finally:
         jobs_queue.put(StopIteration)
@@ -924,7 +924,7 @@ def rsync_monitor_worker(monitor_queue, nb_rsync_processes, total_size, total_fi
 
         monitor_queue.put(stats)
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
 
 
@@ -953,7 +953,7 @@ def messages_worker(options):
                 print >>sys.stderr, _e(newline + "Unknown message type '%s': %s" % (cur_msg_type, result))
             last_msg_type = cur_msg_type
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
     finally:
         if last_msg_type == MSG_PROGRESS:
@@ -1136,7 +1136,7 @@ def msrsync(options, srcs, dest):
 
         return run_stats["errors"]
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         for worker in rsync_workers_procs:
             worker.terminate()
             worker.join()
@@ -1763,5 +1763,5 @@ def main(cmdline):
 if __name__ == '__main__':
     try:
         sys.exit(main(sys.argv))
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
