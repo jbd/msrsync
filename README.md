@@ -10,7 +10,7 @@ It will split the transfer in multiple buckets while the source is scanned and w
 $ msrsync -p 4 /source /destination
 ```
 
-This will copy /source directory in the /destination directory (same behaviour as `rsync` regarding the slash handling) using 4 `rsync` processes (using `"-a --numeric-ids"` as default option. Could be override with `--rsync` option). `msrsync` will split the files and directory list into bucket of 1G or 1000 files maximum (see `--size` and `--files` options) before feeding them to each `rsync` process in parallel using the `--files-from` option. As long as the source and the destination can cope with the parallel I/O (think big boring "enterprise grade" NAS), it should be faster than a single `rsync`.
+This will copy /source directory in the /destination directory (same behaviour as `rsync` regarding the slash handling) using 4 `rsync` processes (using `"-aS --numeric-ids"` as default option. Could be override with `--rsync` option). `msrsync` will split the files and directory list into bucket of 1G or 1000 files maximum (see `--size` and `--files` options) before feeding them to each `rsync` process in parallel using the `--files-from` option. As long as the source and the destination can cope with the parallel I/O (think big boring "enterprise grade" NAS), it should be faster than a single `rsync`.
 
 > `msrsync` shares the same spirit as [fpart](https://github.com/martymac/fpart) (and its [fpsync](https://github.com/martymac/fpart/blob/master/tools/fpsync) associated tool) by [Ganaël Laplanche](https://github.com/martymac) or [parsync](http://moo.nac.uci.edu/~hjm/parsync/) by [Harry Mangalam](https://github.com/hjmangalam). Those are two fantastic much more complete tools used in the field to do real work. Please check them out, they might be what you're looking for.
 
@@ -63,8 +63,8 @@ msrsync options:
     -v, --version         print version
 
 rsync options:
-    -r, --rsync ...       MUST be last option. rsync options as a quoted string ["-a --numeric-ids"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync
-                            *from/filter files if you want to use them. See rsync(1) manpage for details.
+    -r, --rsync ...       MUST be last option. rsync options as a quoted string ["-aS --numeric-ids"]. The "--from0 --files-from=... --quiet --verbose --stats --log-file=..." options will ALWAYS be added, no
+                            matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
 
 self-test options:
     -t, --selftest        run the integrated unit and functional tests
