@@ -933,7 +933,7 @@ def messages_worker(options):
     This queue will contains messages to be print of the screen
     """
 
-    last_msg_type = None
+    last_msg_type = cur_msg_type = None
     try:
         for result in consume_queue(G_MESSAGES_QUEUE):
             if last_msg_type == MSG_PROGRESS:
@@ -956,7 +956,7 @@ def messages_worker(options):
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:
-        if last_msg_type == cur_msg_type:
+        if last_msg_type == MSG_PROGRESS:
             print >>sys.stdout, ''
 
 def start_rsync_workers(jobs_queue, monitor_queue, options, dest):
