@@ -7,7 +7,7 @@ It will split the transfer in multiple buckets while the source is scanned and w
 ## Quick example
 
 ```bash
-$ msrsync -p 4 /source /destination
+$ msrsync -p 4 /source /destination # you can also use -P/--progress and --stats options
 ```
 
 This will copy /source directory in the /destination directory (same behaviour as `rsync` regarding the slash handling) using 4 `rsync` processes (using `"-aS --numeric-ids"` as default option. Could be override with `--rsync` option). `msrsync` will split the files and directory list into bucket of 1G or 1000 files maximum (see `--size` and `--files` options) before feeding them to each `rsync` process in parallel using the `--files-from` option. As long as the source and the destination can cope with the parallel I/O (think big boring "enterprise grade" NAS), it should be faster than a single `rsync`.
