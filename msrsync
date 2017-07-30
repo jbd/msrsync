@@ -10,7 +10,7 @@
 # This file includes a copy of the BSD licensed options.py file from the bup project
 # See https://github.com/bup/bup/blob/master/lib/bup/options.py
 
-VERSION = '20170727'
+VERSION = '20170730'
 
 """
 Simple program from a very specific need. I needed to transfer multiple
