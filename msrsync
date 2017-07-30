@@ -37,7 +37,7 @@ of data already. See https://github.com/martymac/fpart
 # - buckets files should be written in a tree hierarchy to avoid to much files
 #   inside a single directory
 
-DEFAULT_RSYNC_OPTIONS = "-a --numeric-ids"
+DEFAULT_RSYNC_OPTIONS = "-aS --numeric-ids"
 
 MSRSYNC_OPTSPEC = """
 msrsync [options] [--rsync "rsync-options-string"] SRCDIR [SRCDIR2...] DESTDIR
@@ -55,7 +55,7 @@ stats          show additional stats
 d,dry-run      do not run rsync processes
 v,version      print version
  rsync options:
-r,rsync=       MUST be last option. rsync options as a quoted string ["%s"]. The "--from0" option will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
+r,rsync=       MUST be last option. rsync options as a quoted string ["%s"]. The "--from0 --files-from=... --quiet --verbose --stats --log-file=..." options will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
  self-test options:
 t,selftest     run the integrated unit and functional tests
 e,bench        run benchmarks
