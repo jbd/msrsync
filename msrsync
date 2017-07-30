@@ -31,11 +31,8 @@ of data already. See https://github.com/martymac/fpart
 """
 
 # TODO
-# - rsync log summary
 # - handle remote-shell src or dest dir, like a normal rsync
 # - verbose, debug, multiprocessing compliant output
-# - buckets files should be written in a tree hierarchy to avoid to much files
-#   inside a single directory
 
 DEFAULT_RSYNC_OPTIONS = "-aS --numeric-ids"
 
