@@ -203,6 +203,7 @@ results:
 | msrsync -p 8  | 36m55s     |       494            |      5.03            |   x3.68 |
 | msrsync -p 16 | 33m0s      |       552            |      5.62            |   x4.12 |
 
+Astute readers will notify the slight overhead of `msrync` over the equivalent `rsync` in the single process case. This overhead vanishes (but still exists) when you increase processes number. 
 
 ## Notes
 
