@@ -956,11 +956,8 @@ def messages_worker(options):
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:
-        if last_msg_type == MSG_PROGRESS:
-            print >>sys.stdout, os.linesep
-            print >>sys.stderr, os.linesep
-
-
+        if last_msg_type == cur_msg_type:
+            print >>sys.stdout, ''
 
 def start_rsync_workers(jobs_queue, monitor_queue, options, dest):
     """
