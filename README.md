@@ -84,23 +84,25 @@ $ msrsync -p 8 /usr/share/doc/ /tmp/doc/
 ```
 ```
 $ msrsync -P -p 8 /usr/share/doc/ /tmp/doc/
-[33491/33491 entries] [602.1 M/602.1 M transferred] [754 entries/s] [13.6 M/s bw] [monq 1] [jq 1]
+[33491/33491 entries] [602.1 M/602.1 M transferred] [3378 entries/s] [60.7 M/s bw] [monq 1] [jq 1]
 ```
 ```
-$ msrsync --stats -P -p 2 /usr/share/doc/ /tmp/doc/
-[33491/33491 entries] [602.1 M/602.1 M transferred] [2305 entries/s] [41.4 M/s bw] [monq 1] [jq 1]
-
+$ msrsync -P -p 8 --stats /usr/share/doc/ /tmp/doc/
+[33491/33491 entries] [602.1 M/602.1 M transferred] [3533 entries/s] [63.5 M/s bw] [monq 1] [jq 1]
+Status: SUCCESS
+Working directory: /home/jbdenis/Code/msrsync
+Command line: ./msrsync -P -p 8 --stats /usr/share/doc/ /tmp/doc/
 Total size: 602.1 M
 Total entries: 33491
 Buckets number: 34
 Mean entries per bucket: 985
 Mean size per bucket: 17.7 M
-Entries per second: 2305
-Speed: 41.4 M/s
-Rsync workers: 2
-Total rsync's processes (34) cumulative runtime: 14.5s
-Crawl time: 0.3s (4.7% of total runtime)
-Total time: 7.4s
+Entries per second: 3533
+Speed: 63.5 M/s
+Rsync workers: 8
+Total rsync's processes (34) cumulative runtime: 73.0s
+Crawl time: 0.4s (4.3% of total runtime)
+Total time: 9.5s
 ```
 
 ## Performance
