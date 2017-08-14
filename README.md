@@ -20,9 +20,9 @@ Why write `msrsync` if tools like [fpart](https://github.com/martymac/fpart), [p
 
 That's why the only dependencies of msrsync are [python](https://www.python.org/) >=2.6 and [rsync](https://rsync.samba.org/). What python 2.6 ? I'm aiming RHEL6 like distribution as a minimum requirement here, so I'm stuck with python 2.6. I miss some cool features, but that's part of the project.
 
-The devil is in the details. If you need a starting point to think about data migration, this overview by Jeff Layton about is very informative: [Moving Your Data – It’s Not Always Pleasant](http://www.admin-magazine.com/HPC/Articles/Moving-Your-Data-It-s-Not-Always-Pleasant).
+The devil is in the details. If you need a starting point to think about data migration, this overview by Jeff Layton is very informative: [Moving Your Data – It’s Not Always Pleasant](http://www.admin-magazine.com/HPC/Articles/Moving-Your-Data-It-s-Not-Always-Pleasant).
 
-The "[How to transfer large amounts of data via network](http://moo.nac.uci.edu/~hjm/HOWTO_move_data.html)" by `parsync` author is updated regularly and its worth a read also.
+The "[How to transfer large amounts of data via network](http://moo.nac.uci.edu/~hjm/HOWTO_move_data.html)" article by `parsync` author is updated regularly and its worth a read also.
 
 If you can read french, I co-wrote an article with [Ganaël Laplanche](https://github.com/martymac) about [fpart](https://github.com/martymac/fpart) : [Parallélisez vos transferts de fichiers](http://connect.ed-diamond.com/GNU-Linux-Magazine/GLMF-164/Parallelisez-vos-transferts-de-fichiers).
 
