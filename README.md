@@ -213,8 +213,6 @@ Astute readers will notify the slight overhead of `msrync` over the equivalent `
 
 - This may seem obvious but if the source or the destination of the copy cannot handle parallel I/O well, you won't see any benefits (quite the opposite in fact) using `msrsync`.
 
-- If one rsync fails, everything else will also fails. I need to log that and continue. Look for `sys.exit` call in `run_rsync` function.
-
 ## Development
 
 I'm targeting python 2.6 without external dependencies besides rsync. The provided Makefile is just an helper around the embedded testing and coverage.py:
