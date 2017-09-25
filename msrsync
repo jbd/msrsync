@@ -50,6 +50,7 @@ j,show         show bucket directory
 P,progress     show progress
 stats          show additional stats
 d,dry-run      do not run rsync processes
+w,wrapper=     rsync command wrapper (use '%%RSYNC_CMD' as a placeholder)
 v,version      print version
  rsync options:
 r,rsync=       MUST be last option. rsync options as a quoted string ["%s"]. The "--from0 --files-from=... --quiet --verbose --stats --log-file=..." options will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
@@ -58,6 +59,7 @@ t,selftest     run the integrated unit and functional tests
 e,bench        run benchmarks
 g,benchshm     run benchmarks in /dev/shm or the directory in $SHM environment variable
 """ % DEFAULT_RSYNC_OPTIONS
+
 
 
 RSYNC_EXE = None
@@ -82,6 +84,7 @@ EDEST_CREATE = 24
 ENEED_ROOT = 25
 EBENCH = 26
 EMSRSYNC_INTERRUPTED = 27
+EBAD_WRAPPER = 27
 
 TYPE_RSYNC = 0
 TYPE_RSYNC_SENTINEL = 1
@@ -109,6 +112,10 @@ import random
 import unittest
 import signal
 import timeit
+import string
+
+class PercentTemplate(string.Template):
+    delimiter = r'%'
 
 STDOUT_ENCODING = sys.stdout.encoding if None else 'utf8'
 
@@ -773,15 +780,21 @@ def _check_rsync_options(options):
             pass
 
 
-def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
+def run_rsync(files_from, options, src, dest, timeout=3600*24*7):
     """
     Perform rsync using the --files-from option
     """
+    rsync_opts = options.rsync
+    wrapper = options.wrapper
+    dry_run = options.dry_run
     # this looks very close to the _check_rsync_options function...
     # except the error message
     rsync_log = files_from + '.log'
     rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --verbose --stats --from0 --files-from=%s --log-file %s" % (files_from, rsync_log), src, dest)
     #rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --from0 --files-from=%s" % (files_from,), src, dest)
+    if wrapper is not None:
+        rsync_wrapper = PercentTemplate(wrapper)
+        rsync_cmd = rsync_wrapper.substitute({'RSYNC_CMD': rsync_cmd})
 
     rsync_result = dict()
     rsync_result["rcode"] = -1
@@ -790,7 +803,10 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
     rsync_result["log"] = rsync_log
 
     try:
-        ret, _, _, timeout, elapsed = run(rsync_cmd, timeout_sec=timeout)
+        if not dry_run:
+            ret, _, _, timeout, elapsed = run(rsync_cmd, timeout_sec=timeout)
+        else:
+            ret = elapsed = 0
 
         rsync_result["rcode"] = ret
         rsync_result["elapsed"] = elapsed
@@ -814,8 +830,7 @@ def rsync_worker(jobs_queue, monitor_queue, options, dest):
 
     try:
         for src, files_from, bucket_files_nr, bucket_size in consume_queue(jobs_queue):
-            if not options.dry_run:
-                rsync_result = run_rsync(files_from, options.rsync, src, dest)
+            rsync_result = run_rsync(files_from, options, src, dest)
             rsync_mon_result = {"type": TYPE_RSYNC, "rsync_result": rsync_result, "size": bucket_size, "files_nr": bucket_files_nr, "jq_size": jobs_queue.qsize()}
             monitor_queue.put(rsync_mon_result)
     except (KeyboardInterrupt, SystemExit):
@@ -1149,6 +1164,14 @@ def msrsync(options, srcs, dest):
         if options.buckets is not None and not options.keep:
             shutil.rmtree(options.buckets, onerror=rmtree_onerror)
 
+
+def _check_wrapper(wrapper):
+    if wrapper is None:
+        return
+
+    if r'%RSYNC_CMD' not in wrapper:
+        print >>sys.stderr, "Provided wrapper '%s' looks bad. Did you provide %%RSYNC_CMD placeholder ?" % wrapper
+        sys.exit(EBAD_WRAPPER)
 
 def _check_executables():
     """
@@ -1748,6 +1771,7 @@ def main(cmdline):
         benchshm(total_entries=100000)
         sys.exit(0)
 
+    _check_wrapper(options.wrapper)
     _check_executables()
     _check_srcs_dest(srcs, dest)
     _check_rsync_options(options.rsync)
