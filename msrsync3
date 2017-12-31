@@ -649,17 +649,17 @@ def rmtree_onerror(func, path, exc_info):
 
 def write_bucket(filename, bucket, compress=False):
     """
-    Dump bucket filenames in a optionnaly compressed file
+    Dump bucket filenames in a optionally compressed file
     """
     try:
         fileno, path = filename
         if not compress:
-            with os.fdopen(fileno, 'wb') as bfile:
+            with os.fdopen(fileno, 'w') as bfile:
                 for entry in bucket:
                     bfile.write(entry + '\0')
         else:
             os.close(fileno)
-            with gzip.open(path, 'wb') as bfile:
+            with gzip.open(path, 'w') as bfile:
                 for entry in bucket:
                     bfile.write(entry)
     except IOError as err:
