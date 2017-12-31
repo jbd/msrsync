@@ -1079,7 +1079,15 @@ def msrsync(options, srcs, dest):
             # os.path.split("/home/jbdenis/Code/")[0] will return '/home/jbdenis/Code'
             # We need that to correctly generate the --files-from files and the src path
             # that will be used on the rsync command line
-            src_base = os.path.split(src)[0]
+
+            # if src is a single directory, without trailing slash
+            # os.path.split("src") returns ('', 'src')
+            head, tail = os.path.split(src)
+            if head == '':
+                src_base = os.getcwd()
+            else:
+                src_base = head
+
             for bucket_files_nr, bucket_size, bucket in buckets(src, options.files, options.s):
                 total_size.value += bucket_size
                 total_files_nr.value += bucket_files_nr
