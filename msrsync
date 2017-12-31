@@ -580,8 +580,9 @@ def _valid_rsync_options(options, rsync_opts):
     Check for weird stuff in rsync options
     """
     rsync_args = rsync_opts.split()
-    if "--delete" in rsync_args:
-        options.fatal("Cannot use --delete with msrsync. It would lead to disaster :)")
+    for opt in rsync_args:
+        if opt.startswith("--delete"):
+            options.fatal("Cannot use --delete option type with msrsync. It would lead to disaster :)")
 
 
 def parse_cmdline(cmdline_argv):
@@ -601,6 +602,10 @@ def parse_cmdline(cmdline_argv):
     # I cannot use options parser to parse --rsync since some msrsync use some options
     # name already used by rsync. So I only parse the command line up to the --rsync token
     # and ugly parse what I want. Any better idea ?
+    if "-r" in cmdline_argv:
+        idx = cmdline_argv.index("-r")
+        cmdline_argv[idx] = "--rsync"
+
     if "--rsync" in cmdline_argv:
         idx = cmdline_argv.index("--rsync")
         # we parse the command line up to --rsync options marker
