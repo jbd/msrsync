@@ -580,8 +580,9 @@ def _valid_rsync_options(options, rsync_opts):
     Check for weird stuff in rsync options
     """
     rsync_args = rsync_opts.split()
-    if "--delete" in rsync_args:
-        options.fatal("Cannot use --delete with msrsync. It would lead to disaster :)")
+    for opt in rsync_args:
+        if opt.startswith("--delete"):
+            options.fatal("Cannot use --delete option type with msrsync. It would lead to disaster :)")
 
 
 def parse_cmdline(cmdline_argv):
@@ -601,6 +602,10 @@ def parse_cmdline(cmdline_argv):
     # I cannot use options parser to parse --rsync since some msrsync use some options
     # name already used by rsync. So I only parse the command line up to the --rsync token
     # and ugly parse what I want. Any better idea ?
+    if "-r" in cmdline_argv:
+        idx = cmdline_argv.index("-r")
+        cmdline_argv[idx] = "--rsync"
+
     if "--rsync" in cmdline_argv:
         idx = cmdline_argv.index("--rsync")
         # we parse the command line up to --rsync options marker
@@ -714,7 +719,7 @@ def run(cmd, capture_stdout=False, capture_stderr=False, timeout_sec=sys.maxsize
             proc.wait()
         return 666, "", "Interrupted", False, 0
 
-    return proc.returncode, stdout.decode("utf-8", "replace"), stderr.decode("utf-8", "replace"), timeout["value"], elapsed
+    return proc.returncode, stdout, stderr, timeout["value"], elapsed
 
 
 # stolen from stackoverflow (http://stackoverflow.com/a/377028)
@@ -1074,7 +1079,15 @@ def msrsync(options, srcs, dest):
             # os.path.split("/home/jbdenis/Code/")[0] will return '/home/jbdenis/Code'
             # We need that to correctly generate the --files-from files and the src path
             # that will be used on the rsync command line
-            src_base = os.path.split(src)[0]
+
+            # if src is a single directory, without trailing slash
+            # os.path.split("src") returns ('', 'src')
+            head, tail = os.path.split(src)
+            if head == '':
+                src_base = os.getcwd()
+            else:
+                src_base = head
+
             for bucket_files_nr, bucket_size, bucket in buckets(src, options.files, options.s):
                 total_size.value += bucket_size
                 total_files_nr.value += bucket_files_nr
