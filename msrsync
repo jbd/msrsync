@@ -1474,6 +1474,17 @@ class TestOptionsParser(unittest.TestCase):
 
         self.fail("Should have raised a SystemExit exception")
 
+    def test_rsync_delete3(self):
+        """ command line with -r option that contains --delete """
+        try:
+            cmdline = shlex.split("""msrsync -r "-a --numeric-ids --delete" src dst""")
+            parse_cmdline(cmdline)
+        except SystemExit, err:
+            self.assertEqual(err.code, EOPTION_PARSER)
+            return
+
+        self.fail("Should have raised a SystemExit exception")
+
 
 class TestRsyncOptionsChecker(unittest.TestCase):
     """
