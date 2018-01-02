@@ -647,24 +647,48 @@ def rmtree_onerror(func, path, exc_info):
     print("Error removing", path, file=sys.stderr)
 
 
+#def write_bucket(filename, bucket, compress=False):
+#    """
+#    Dump bucket filenames in a optionally compressed file
+#    """
+#    try:
+#        fileno, path = filename
+#        if not compress:
+#            with os.fdopen(fileno, 'w') as bfile:
+#                for entry in bucket:
+#                    bfile.write(entry + '\0')
+#        else:
+#            os.close(fileno)
+#            with gzip.open(path, 'w') as bfile:
+#                for entry in bucket:
+#                    bfile.write(entry)
+#    except:
+#        raise BucketError("Cannot write bucket file %s: %s" % (path, sys.exc_info()[0]))
+
+
 def write_bucket(filename, bucket, compress=False):
     """
     Dump bucket filenames in a optionally compressed file
     """
-    try:
-        fileno, path = filename
-        if not compress:
-            with os.fdopen(fileno, 'w') as bfile:
-                for entry in bucket:
+    fileno, path = filename
+    if not compress:
+        with os.fdopen(fileno, 'w') as bfile:
+            for entry in bucket:
+                try:
                     bfile.write(entry + '\0')
-        else:
-            os.close(fileno)
-            with gzip.open(path, 'w') as bfile:
-                for entry in bucket:
+                except:
+                    print("Unable to write {} because {}".format(ascii(entry), sys.exc_info()[0]))
+                    continue
+                    
+    else:
+        os.close(fileno)
+        with gzip.open(path, 'w') as bfile:
+            for entry in bucket:
+                try:
                     bfile.write(entry)
-    except IOError as err:
-        raise BucketError("Cannot write bucket file %s: %s" % (path, err))
-
+                except:
+                    print("Unable to write {} because {}".format(ascii(entry), sys.exc_info()[0]))
+                    continue
 
 def consume_queue(jobs_queue):
     """
