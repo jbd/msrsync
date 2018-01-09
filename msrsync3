@@ -1125,7 +1125,7 @@ def msrsync(options, srcs, dest):
                 # get turned into file-list elements.
                 bucket.sort()
                 # the idea is prevent to have too much files in a single directory
-                d1s = str(bucket_nr / 1024).zfill(8)
+                d1s = str(int(bucket_nr / 1024)).zfill(8)
                 # with bucket_nr == 12, d1s == i'00000000'
                 # tdir = options.buckets/0000/0000
                 # with bucket_nr == 11058, d1s == '00000100'
