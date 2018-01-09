@@ -1369,7 +1369,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_nooption(self):
         """ parse cmdline without argument"""
         try:
-            cmdline = shlex.split("msrsync")
+            cmdline = shlex.split("msrsync3")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1380,7 +1380,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_justrsync(self):
         """ parse cmdline with only --rsync option"""
         try:
-            cmdline = shlex.split("msrsync --rsync")
+            cmdline = shlex.split("msrsync3 --rsync")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1391,7 +1391,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_badsize(self):
         """ parse cmdline with a bad size"""
         try:
-            cmdline = shlex.split("msrsync -s abcde src dest")
+            cmdline = shlex.split("msrsync3 -s abcde src dest")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1402,7 +1402,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_badsize2(self):
         """ parse cmdline with a bad size"""
         try:
-            cmdline = shlex.split("msrsync -s abcde src dest")
+            cmdline = shlex.split("msrsync3 -s abcde src dest")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1414,7 +1414,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_bad_filesnumber(self):
         """ parse cmdline with a bad size"""
         try:
-            cmdline = shlex.split("msrsync -f abcde src dest")
+            cmdline = shlex.split("msrsync3 -f abcde src dest")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1425,7 +1425,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_only_src(self):
         """ parse cmdline with only a source dir"""
         try:
-            cmdline = shlex.split("msrsync src")
+            cmdline = shlex.split("msrsync3 src")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1435,7 +1435,7 @@ class TestOptionsParser(unittest.TestCase):
 
     def test_src_dst(self):
         """ test a basic and valid command line """
-        cmdline = shlex.split("msrsync src dst")
+        cmdline = shlex.split("msrsync3 src dst")
         opt, srcs, dst = parse_cmdline(cmdline)
         self.assertEqual(opt.rsync, DEFAULT_RSYNC_OPTIONS)
         self.assertEqual(srcs, ["src"])
@@ -1443,7 +1443,7 @@ class TestOptionsParser(unittest.TestCase):
 
     def test_src_multiple_dst(self):
         """ test a command line with multiple sources """
-        cmdline = shlex.split("msrsync src1 src2 dst")
+        cmdline = shlex.split("msrsync3 src1 src2 dst")
         opt, srcs, dst = parse_cmdline(cmdline)
         self.assertEqual(opt.rsync, DEFAULT_RSYNC_OPTIONS)
         self.assertEqual(srcs, ["src1", "src2"])
@@ -1451,7 +1451,7 @@ class TestOptionsParser(unittest.TestCase):
 
     def test_src_dst_rsync(self):
         """ test a basic and valid command line with rsync option """
-        cmdline = shlex.split("""msrsync --rsync "--numeric-ids" src dst""")
+        cmdline = shlex.split("""msrsync3 --rsync "--numeric-ids" src dst""")
         opt, srcs, dst = parse_cmdline(cmdline)
         self.assertEqual(opt.rsync, "--numeric-ids")
         self.assertEqual(srcs, ["src"])
@@ -1459,7 +1459,7 @@ class TestOptionsParser(unittest.TestCase):
 
     def test_src_multiple_dst_rsync(self):
         """ test a command line with multiple sources """
-        cmdline = shlex.split("""msrsync --rsync "--numeric-ids" src1 src2 dst""")
+        cmdline = shlex.split("""msrsync3 --rsync "--numeric-ids" src1 src2 dst""")
         opt, srcs, dst = parse_cmdline(cmdline)
         self.assertEqual(opt.rsync, "--numeric-ids")
         self.assertEqual(srcs, ["src1", "src2"])
@@ -1468,7 +1468,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_src_dest_empty_rsync(self):
         """ test a basic and valid command line, but with empty rsync option """
         try:
-            cmdline = shlex.split("msrsync --rsync src dst")
+            cmdline = shlex.split("msrsync3 --rsync src dst")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1479,7 +1479,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_rsync_delete(self):
         """ command line with --rsync option that contains --delete """
         try:
-            cmdline = shlex.split("""msrsync --rsync "--delete" dst""")
+            cmdline = shlex.split("""msrsync3 --rsync "--delete" dst""")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1490,7 +1490,7 @@ class TestOptionsParser(unittest.TestCase):
     def test_rsync_delete2(self):
         """ command line with --rsync option that contains --delete """
         try:
-            cmdline = shlex.split("""msrsync --rsync "-a --numeric-ids --delete" src dst""")
+            cmdline = shlex.split("""msrsync3 --rsync "-a --numeric-ids --delete" src dst""")
             parse_cmdline(cmdline)
         except SystemExit as err:
             self.assertEqual(err.code, EOPTION_PARSER)
@@ -1538,7 +1538,7 @@ class TestSyncAPI(unittest.TestCase):
 
     def _msrsync_test_helper(self, options=""):
         """ msrsync test helper """
-        cmdline = """msrsync %s %s %s""" % (options, self.src, self.dst)
+        cmdline = """msrsync3 %s %s %s""" % (options, self.src, self.dst)
         main(shlex.split(cmdline))
         self.assertTrue(_compare_trees(self.src, self.dst), "The source %s and destination %s tree are not equal." % (self.src, self.dst))
 
@@ -1583,7 +1583,7 @@ class TestSyncCLI(unittest.TestCase):
         """ msrsync test helper """
         cmd = "%s %s %s %s" % (os.path.realpath(__file__), options, self.src + os.sep, self.dst)
         ret, _, _, timeout, _ = run(cmd, timeout_sec=60)
-        self.assertTrue(not timeout, "The msrsync command has timeouted.")
+        self.assertTrue(not timeout, "The msrsync command has timed out.")
         self.assertEqual(ret, 0, "The msrsync command has failed.")
         self.assertTrue(_compare_trees(self.src, self.dst), "The source %s and destination %s tree are not equal." % (self.src, self.dst))
 
