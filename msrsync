@@ -821,6 +821,8 @@ def rsync_worker(jobs_queue, monitor_queue, options, dest):
         for src, files_from, bucket_files_nr, bucket_size in consume_queue(jobs_queue):
             if not options.dry_run:
                 rsync_result = run_rsync(files_from, options.rsync, src, dest)
+            else:
+                rsync_result = dict(rcode=0, elapsed=0, errcode=0, msg='')
             rsync_mon_result = {"type": TYPE_RSYNC, "rsync_result": rsync_result, "size": bucket_size, "files_nr": bucket_files_nr, "jq_size": jobs_queue.qsize()}
             monitor_queue.put(rsync_mon_result)
     except (KeyboardInterrupt, SystemExit):
