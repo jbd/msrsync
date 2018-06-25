@@ -785,7 +785,7 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
     # this looks very close to the _check_rsync_options function...
     # except the error message
     rsync_log = files_from + '.log'
-    rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --verbose --stats --from0 --files-from=%s --log-file %s" % (files_from, rsync_log), src, dest)
+    rsync_cmd = '%s %s %s "%s" "%s"' % (RSYNC_EXE, rsync_opts, "--quiet --verbose --stats --from0 --files-from=%s --log-file %s" % (files_from, rsync_log), src, dest)
     #rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --from0 --files-from=%s" % (files_from,), src, dest)
 
     rsync_result = dict()
