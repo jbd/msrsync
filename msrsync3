@@ -507,7 +507,6 @@ def human_size(value):
 
     return size * m2s[multiple]
 
-
 def crawl(path, relative=False):
     """
     Simple generator around os.walk that will
@@ -525,7 +524,6 @@ def crawl(path, relative=False):
         print_message("msrsync crawl: %s" % oserror, MSG_STDERR)
 
     root_size = len(path) if relative else 0
-
     for root, dirs, files in os.walk(path, onerror=onerror):
         # we want empty dir to be listed in bucket
         if len(dirs) == 0 and len(files) == 0:
@@ -561,7 +559,21 @@ def buckets(path, filesnr, size):
     base = os.path.split(path)[1]
 
     for fsize, rpath in crawl(path, relative=True):
-        bucket.append(os.path.join(base, rpath.lstrip(os.sep)))
+    # trying to account for windows encoded files here since python3 is utf-8 by default
+        try:
+            rpathstripped = (rpath.decode('utf-8').lstrip(os.sep) + '\0').encode()
+        except UnicodeDecodeError:
+            win_rpathstripped = (rpath.decode('ISO-8859-1').lstrip(os.sep) + '\n').encode('ISO-8859-1')
+            win_path = os.path.join(base, win_rpathstripped)
+            if os.path.exists('encoding_errors'):
+                openmode = 'ab'
+            else:
+                openmode = 'wb'
+            with open ('encoding_errors', openmode) as f:
+                f.write(win_path)
+            continue
+        joinedpath = os.path.join(base, rpathstripped)
+        bucket.append(joinedpath)
         bucket_files_nr += 1
         bucket_size += fsize
 
@@ -590,6 +602,7 @@ def parse_cmdline(cmdline_argv):
     command line parsing of msrsync using bup/options.py
     See https://github.com/bup/bup/blob/master/lib/bup/options.py
     """
+    srcs = []
 
     # If I want to run this script on RHEL6 and derivatives without installing any dependencies
     # except python and rsync, I can't rely on argparse which is only available in python >= 2.7
@@ -614,7 +627,7 @@ def parse_cmdline(cmdline_argv):
             options.fatal('You must provide a source, a destination and eventually rsync options with --rsync')
         opt.rsync = opt.r = cmdline_argv[idx+1] # pylint: disable=invalid-name, attribute-defined-outside-init
         _valid_rsync_options(options, opt.rsync)
-        srcs, dest = cmdline_argv[idx+2:-1], cmdline_argv[-1]
+        dirtysrcs, dest = cmdline_argv[idx+2:-1], cmdline_argv[-1]
     else:
         # no --rsync options marker on the command line.
         (opt, _, extra) = options.parse(cmdline_argv[1:])
@@ -623,7 +636,11 @@ def parse_cmdline(cmdline_argv):
         opt.rsync = opt.r = DEFAULT_RSYNC_OPTIONS # pylint: disable=attribute-defined-outside-init
         if not extra or len(extra) < 2:
             options.fatal('You must provide a source and a destination')
-        srcs, dest = extra[:-1], extra[-1]
+        dirtysrcs, dest = extra[:-1], extra[-1]
+
+    for src in dirtysrcs:
+        src = str.encode(src)
+        srcs.append(src)
 
     size = human_size(str(opt.size))
     if not size:
@@ -647,48 +664,48 @@ def rmtree_onerror(func, path, exc_info):
     print("Error removing", path, file=sys.stderr)
 
 
-#def write_bucket(filename, bucket, compress=False):
-#    """
-#    Dump bucket filenames in a optionally compressed file
-#    """
-#    try:
-#        fileno, path = filename
-#        if not compress:
-#            with os.fdopen(fileno, 'w') as bfile:
-#                for entry in bucket:
-#                    bfile.write(entry + '\0')
-#        else:
-#            os.close(fileno)
-#            with gzip.open(path, 'w') as bfile:
-#                for entry in bucket:
-#                    bfile.write(entry)
-#    except:
-#        raise BucketError("Cannot write bucket file %s: %s" % (path, sys.exc_info()[0]))
-
-
 def write_bucket(filename, bucket, compress=False):
     """
     Dump bucket filenames in a optionally compressed file
     """
-    fileno, path = filename
-    if not compress:
-        with os.fdopen(fileno, 'w') as bfile:
-            for entry in bucket:
-                try:
-                    bfile.write(entry + '\0')
-                except:
-                    print("Unable to write {} because {}".format(ascii(entry), sys.exc_info()[0]))
-                    continue
-                    
-    else:
-        os.close(fileno)
-        with gzip.open(path, 'w') as bfile:
-            for entry in bucket:
-                try:
+    try:
+        fileno, path = filename
+        if not compress:
+            with os.fdopen(fileno, 'wb') as bfile:
+                for entry in bucket:
                     bfile.write(entry)
-                except:
-                    print("Unable to write {} because {}".format(ascii(entry), sys.exc_info()[0]))
-                    continue
+        else:
+            os.close(fileno)
+            with gzip.open(path, 'w') as bfile:
+                for entry in bucket:
+                    bfile.write(entry)
+    except:
+        raise BucketError("Cannot write bucket file %s: %s" % (path, sys.exc_info()[0]))
+
+
+#def write_bucket(filename, bucket, compress=False):
+#    """
+#    Dump bucket filenames in a optionally compressed file
+#    """
+#    fileno, path = filename
+#    if not compress:
+#        with os.fdopen(fileno, 'w') as bfile:
+#            for entry in bucket:
+#                try:
+#                    bfile.write(entry + '\0')
+#                except:
+#                    print("Unable to write {} because {}".format(ascii(entry), sys.exc_info()[0]))
+#                    continue
+#                    
+#    else:
+#        os.close(fileno)
+#        with gzip.open(path, 'w') as bfile:
+#            for entry in bucket:
+#                try:
+#                    bfile.write(entry)
+#                except:
+#                    print("Unable to write {} because {}".format(ascii(entry), sys.exc_info()[0]))
+#                    continue
 
 def consume_queue(jobs_queue):
     """
@@ -809,7 +826,7 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
     # this looks very close to the _check_rsync_options function...
     # except the error message
     rsync_log = files_from + '.log'
-    rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --verbose --stats --from0 --files-from=%s --log-file %s" % (files_from, rsync_log), src, dest)
+    rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --verbose --stats --from0 --files-from=%s --log-file %s" % (files_from, rsync_log), src.decode('utf-8'), dest)
     #rsync_cmd = "%s %s %s %s %s" % (RSYNC_EXE, rsync_opts, "--quiet --from0 --files-from=%s" % (files_from,), src, dest)
 
     rsync_result = dict()
