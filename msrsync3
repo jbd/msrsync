@@ -547,6 +547,9 @@ def buckets(path, filesnr, size):
     bucket_files_nr = 0
     bucket_size = 0
     bucket = list()
+    winbucket_files_nr = 0
+    winbucket_size = 0
+    winbucket = list()
 
 
     # if we've got a trailing slash in the path, we want
@@ -562,20 +565,22 @@ def buckets(path, filesnr, size):
     # trying to account for windows encoded files here since python3 is utf-8 by default
         try:
             rpathstripped = (rpath.decode('utf-8').lstrip(os.sep) + '\0').encode()
+            joinedpath = os.path.join(base, rpathstripped)
+            bucket.append(joinedpath)
+            bucket_files_nr += 1
+            bucket_size += fsize
         except UnicodeDecodeError:
-            win_rpathstripped = (rpath.decode('ISO-8859-1').lstrip(os.sep) + '\n').encode('ISO-8859-1')
+            win_rpathstripped = (rpath.decode('ISO-8859-1').lstrip(os.sep) + '\0').encode('ISO-8859-1')
             win_path = os.path.join(base, win_rpathstripped)
-            if os.path.exists('encoding_errors'):
-                openmode = 'ab'
-            else:
-                openmode = 'wb'
-            with open ('encoding_errors', openmode) as f:
-                f.write(win_path)
-            continue
-        joinedpath = os.path.join(base, rpathstripped)
-        bucket.append(joinedpath)
-        bucket_files_nr += 1
-        bucket_size += fsize
+    #        if os.path.exists('encoding_errors'):
+    #            openmode = 'ab'
+    #        else:
+    #            openmode = 'wb'
+    #        with open ('encoding_errors', openmode) as f:
+    #            f.write(win_path)
+            winbucket.append(win_path)
+            winbucket_files_nr += 1
+            winbucket_size += fsize
 
         if bucket_size >= size or bucket_files_nr >= filesnr:
             yield (bucket_files_nr, bucket_size, bucket)
@@ -583,9 +588,17 @@ def buckets(path, filesnr, size):
             bucket_files_nr = 0
             bucket = list()
 
+        if winbucket_size >= size or winbucket_files_nr >= filesnr:
+            yield (winbucket_files_nr, winbucket_size, winbucket)
+            winbucket_size = 0
+            winbucket_files_nr = 0
+            winbucket = list()
+
     if bucket_files_nr > 0:
         yield (bucket_files_nr, bucket_size, bucket)
 
+    if winbucket_files_nr > 0:
+        yield (winbucket_files_nr, winbucket_size, winbucket)
 
 def _valid_rsync_options(options, rsync_opts):
     """
