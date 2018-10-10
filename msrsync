@@ -530,13 +530,22 @@ def crawl(path, relative=False):
         # we want empty dir to be listed in bucket
         if len(dirs) == 0 and len(files) == 0:
             rpath = root[root_size:]
-            yield os.lstat(root).st_size, rpath
+            try:
+                yield os.lstat(root).st_size, rpath
+            except OSError, err:
+                print_message("msrsync crawl: %s" % err, MSG_STDERR)
+                continue
 
         dir_links = [d for d in dirs if os.path.islink(os.path.join(root, d))]
 
         for name in itertools.chain(files, dir_links):
             fullpath = os.path.join(root, name)
-            size = os.lstat(fullpath).st_size
+            try:
+                size = os.lstat(fullpath).st_size
+            except OSError, err:
+                print_message("msrsync crawl: %s" % err, MSG_STDERR)
+                continue
+
             rpath = fullpath[root_size:]
             yield size, rpath
 
