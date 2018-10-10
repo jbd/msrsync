@@ -45,6 +45,7 @@ p,processes=   number of rsync processes to use [1]
 f,files=       limit buckets to <files> files number [1000]
 s,size=        limit partitions to BYTES size (1024 suffixes: K, M, G, T, P, E, Z, Y) [1G]
 b,buckets=     where to put the buckets files (default: auto temporary directory)
+x,exclude=       very simple exclude that will filter file during the msrsync crawling phase. It will exclude path beginning with the argument. (comma separated list)
 k,keep         do not remove buckets directory at the end
 j,show         show bucket directory
 P,progress     show progress
@@ -508,7 +509,7 @@ def human_size(value):
     return size * m2s[multiple]
 
 
-def crawl(path, relative=False):
+def crawl(path, excludes=None, relative=False):
     """
     Simple generator around os.walk that will
     yield (size, fullpath) tuple for each file or link
@@ -522,20 +523,30 @@ def crawl(path, relative=False):
         """
         helper
         """
-        print_message("msrsync crawl: %s" % oserror, MSG_STDERR)
+        print_message("msrsync crawl 0: %s" % oserror, MSG_STDERR)
+
+    def do_exclude(path):
+        for e in excludes:
+            if path.startswith(e):
+                return True
+        return False
 
     root_size = len(path) if relative else 0
 
     for root, dirs, files in os.walk(path, onerror=onerror):
+        if excludes and do_exclude(root):
+            dirs[:] = []
+            continue
         # we want empty dir to be listed in bucket
         if len(dirs) == 0 and len(files) == 0:
             rpath = root[root_size:]
             try:
                 yield os.lstat(root).st_size, rpath
             except OSError, err:
-                print_message("msrsync crawl: %s" % err, MSG_STDERR)
+                print_message("msrsync crawl 1: %s" % err, MSG_STDERR)
                 continue
 
+        dirs[:] = [d for d in dirs if not do_exclude(os.path.join(root, d))] 
         dir_links = [d for d in dirs if os.path.islink(os.path.join(root, d))]
 
         for name in itertools.chain(files, dir_links):
@@ -543,14 +554,14 @@ def crawl(path, relative=False):
             try:
                 size = os.lstat(fullpath).st_size
             except OSError, err:
-                print_message("msrsync crawl: %s" % err, MSG_STDERR)
+                print_message("msrsync crawl 2: %s" % err, MSG_STDERR)
                 continue
 
             rpath = fullpath[root_size:]
             yield size, rpath
 
 
-def buckets(path, filesnr, size):
+def buckets(path, filesnr, size, exclude):
     """
     Split files underneath path in buckets less than <size> bytes in total
     or containing <filesnr> files maximum.
@@ -569,7 +580,7 @@ def buckets(path, filesnr, size):
     # os.path.split("/home/jbdenis/Code/")[1] will return ''
     base = os.path.split(path)[1]
 
-    for fsize, rpath in crawl(path, relative=True):
+    for fsize, rpath in crawl(path, exclude, relative=True):
         bucket.append(os.path.join(base, rpath.lstrip(os.sep)))
         bucket_files_nr += 1
         bucket_size += fsize
@@ -1099,7 +1110,7 @@ def msrsync(options, srcs, dest):
             else:
                 src_base = head
 
-            for bucket_files_nr, bucket_size, bucket in buckets(src, options.files, options.s):
+            for bucket_files_nr, bucket_size, bucket in buckets(src, options.files, options.s, options.exclude):
                 total_size.value += bucket_size
                 total_files_nr.value += bucket_files_nr
                 # from the rsync man page (--files-from part):
@@ -1783,9 +1794,13 @@ def main(cmdline):
         benchshm(total_entries=100000)
         sys.exit(0)
 
+    if options.exclude:
+        options.exclude = options.exclude.split(',')
+
     _check_executables()
     _check_srcs_dest(srcs, dest)
     _check_rsync_options(options.rsync)
+
     return msrsync(options, srcs, dest)
 
 
