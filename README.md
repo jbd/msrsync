@@ -14,6 +14,8 @@ This will copy /source directory in the /destination directory (same behaviour a
 
 > `msrsync` shares the same spirit as [fpart](https://github.com/martymac/fpart) (and its [fpsync](https://github.com/martymac/fpart/blob/master/tools/fpsync) associated tool) by [Ganaël Laplanche](https://github.com/martymac) or [parsync](http://moo.nac.uci.edu/~hjm/parsync/) by [Harry Mangalam](https://github.com/hjmangalam). Those are two fantastic much more complete tools used in the field to do real work. Please check them out, they might be what you're looking for.
 
+You can also check [fcp][https://github.com/olcf/pcircle] from the pcircle project. It looks very powerful. See the [associated publication][https://cug.org/proceedings/cug2016_proceedings/includes/files/pap142s2-file1.pdf].
+
 ## Motivation
 
 Why write `msrsync` if tools like [fpart](https://github.com/martymac/fpart), [parsync](http://moo.nac.uci.edu/~hjm/parsync/) or [pftool](https://github.com/pftool/pftool) exist ? While reasonable, their dependencies can be a point of friction given the constraints we can have on a given system. When you're lucky, you can use your package manager ([fpart](https://github.com/martymac/fpart) seems to be well supported among various GNU/Linux and FreeBSD distribution: [FreeBSD](http://www.freshports.org/sysutils/fpart), [Debian](http://packages.debian.org/fpart), [Ubuntu](http://packages.ubuntu.com/fpart), [Archlinux](https://aur.archlinux.org/packages/fpart/), [OBS](https://build.opensuse.org/package/show/home:mgoppold/fpart)) to deal with the requirements but more often than not, I found myself struggling with the sad state of the machine I'm working with.
