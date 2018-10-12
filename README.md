@@ -14,7 +14,7 @@ This will copy /source directory in the /destination directory (same behaviour a
 
 > `msrsync` shares the same spirit as [fpart](https://github.com/martymac/fpart) (and its [fpsync](https://github.com/martymac/fpart/blob/master/tools/fpsync) associated tool) by [Ganaël Laplanche](https://github.com/martymac) or [parsync](http://moo.nac.uci.edu/~hjm/parsync/) by [Harry Mangalam](https://github.com/hjmangalam). Those are two fantastic much more complete tools used in the field to do real work. Please check them out, they might be what you're looking for.
 
-You can also check [fcp][https://github.com/olcf/pcircle] from the pcircle project. It looks very powerful. See the [associated publication][https://cug.org/proceedings/cug2016_proceedings/includes/files/pap142s2-file1.pdf].
+You can also check [fcp](https://github.com/olcf/pcircle) from the pcircle project. It looks very powerful. See the [associated publication](https://cug.org/proceedings/cug2016_proceedings/includes/files/pap142s2-file1.pdf).
 
 ## Motivation
 
