@@ -261,3 +261,7 @@ Ran 29 tests in 3.320s
 
 OK
 ```
+
+## msrsync3
+carlilek: Added a python3 specific version called msrsync3. Not completely tested, use at your own risk. All command line options are the same as msrsync.
+```
