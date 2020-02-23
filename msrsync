@@ -845,8 +845,8 @@ def rsync_worker(jobs_queue, monitor_queue, options, dests):
     try:
         for src, files_from, bucket_files_nr, bucket_size in consume_queue(jobs_queue):
             if not options.dry_run:
-        # dests contains the destination directory + optional addtional equivalent directories (--adsts cli option)
-        dest = random.choice(dests)
+            # dests contains the destination directory + optional addtional equivalent directories (--adsts cli option)
+                dest = random.choice(dests)
                 rsync_result = run_rsync(files_from, options.rsync, src, dest)
             else:
                 rsync_result = dict(rcode=0, elapsed=0, errcode=0, msg='')
@@ -1108,10 +1108,10 @@ def msrsync(options, srcs, dest):
 
         # if src is a single directory, without trailing slash
         # os.path.split("src") returns ('', 'src')
-    src = random.choice(all_srcs)
+        src = random.choice(all_srcs)
         head, tail = os.path.split(src)
         if head == '':
-        return os.getcwd()
+            return os.getcwd()
         else:
             return head
 
@@ -1237,13 +1237,13 @@ def _check_srcs_dest(srcs, dsts):
                 print >>sys.stderr, "Error creating destination directory '%s': %s" % (dest, err)
                 sys.exit(EDEST_CREATE)
 
-    if os.path.isfile(dest):
-        print >>sys.stderr, "Destination '%s' already exists and is a file" % dest
-        sys.exit(EDEST_IS_FILE)
+        if os.path.isfile(dest):
+            print >>sys.stderr, "Destination '%s' already exists and is a file" % dest
+            sys.exit(EDEST_IS_FILE)
 
-    if os.path.isdir(dest) and not os.access(dest, os.W_OK|os.X_OK):
-        print >>sys.stderr, "Destination directory '%s' not writable" % dest
-        sys.exit(EDEST_NO_ACCESS)
+        if os.path.isdir(dest) and not os.access(dest, os.W_OK|os.X_OK):
+            print >>sys.stderr, "Destination directory '%s' not writable" % dest
+            sys.exit(EDEST_NO_ACCESS)
 
 
 def _create_level_entries(cwd, max_entries, files_pct):
