@@ -50,6 +50,8 @@ j,show         show bucket directory
 P,progress     show progress
 stats          show additional stats
 d,dry-run      do not run rsync processes
+add-sources=   additional paths to the source directory, comma separated (multiple mountpoints for example)
+add-dests=     additional paths to the destination directory, comma separated (multiple mountpoints for example)
 v,version      print version
  rsync options:
 r,rsync=       MUST be last option. rsync options as a quoted string ["%s"]. The "--from0 --files-from=... --quiet --verbose --stats --log-file=..." options will ALWAYS be added, no matter what. Be aware that this will affect all rsync *from/filter files if you want to use them. See rsync(1) manpage for details.
@@ -634,6 +636,20 @@ def parse_cmdline(cmdline_argv):
             options.fatal('You must provide a source and a destination')
         srcs, dest = extra[:-1], extra[-1]
 
+    if opt.add_sources and len(srcs) > 1:
+        options.fatal('You cannot use more than one SRCDIR with --asrcs option')
+
+    # we build list for additional sources and destinations
+    if opt.add_sources:
+        opt.add_sources = opt.add_sources.split(',')
+    else:
+        opt.add_sources = list()
+
+    if opt.add_dests:
+        opt.add_dests = opt.add_dests.split(',')
+    else:
+        opt.add_dests = list()
+
     size = human_size(str(opt.size))
     if not size:
         options.fatal("'%s' does not look like a valid size value" % opt.size)
@@ -821,7 +837,7 @@ def run_rsync(files_from, rsync_opts, src, dest, timeout=3600*24*7):
     return rsync_result
 
 
-def rsync_worker(jobs_queue, monitor_queue, options, dest):
+def rsync_worker(jobs_queue, monitor_queue, options, dests):
     """
     The queue will contains filenames of file to handle by individual rsync processes
     """
@@ -829,6 +845,8 @@ def rsync_worker(jobs_queue, monitor_queue, options, dest):
     try:
         for src, files_from, bucket_files_nr, bucket_size in consume_queue(jobs_queue):
             if not options.dry_run:
+        # dests contains the destination directory + optional addtional equivalent directories (--adsts cli option)
+        dest = random.choice(dests)
                 rsync_result = run_rsync(files_from, options.rsync, src, dest)
             else:
                 rsync_result = dict(rcode=0, elapsed=0, errcode=0, msg='')
@@ -972,13 +990,13 @@ def messages_worker(options):
         if last_msg_type == MSG_PROGRESS:
             print >>sys.stdout, ''
 
-def start_rsync_workers(jobs_queue, monitor_queue, options, dest):
+def start_rsync_workers(jobs_queue, monitor_queue, options, dests):
     """
     Helper to start rsync processes
     """
     processes = []
     for _ in xrange(options.processes):
-        processes.append(multiprocessing.Process(target=rsync_worker, args=(jobs_queue, monitor_queue, options, dest)))
+        processes.append(multiprocessing.Process(target=rsync_worker, args=(jobs_queue, monitor_queue, options, dests)))
         processes[-1].start()
     return processes
 
@@ -1075,30 +1093,32 @@ def msrsync(options, srcs, dest):
     jobs_queue = manager.Queue() # pylint: disable=no-member
     G_MESSAGES_QUEUE = manager.Queue() # pylint: disable=no-member
 
-    rsync_workers_procs = start_rsync_workers(jobs_queue, monitor_queue, options, dest)
+    rsync_workers_procs = start_rsync_workers(jobs_queue, monitor_queue, options, [dest] + options.add_dests)
     rsync_monitor_worker_proc = start_rsync_monitor_worker(monitor_queue, options.processes, total_size, total_files_nr, crawl_time, total_time, options)
     messages_worker_proc = start_messages_worker(options)
 
     crawl_start = timeit.default_timer()
 
+    def _choose_src_base(all_srcs):
+        # do we want to sync to content of src or src itself ?
+        # os.path.split("/home/jbdenis/Code")[0] will return '/home/jbdenis'
+        # os.path.split("/home/jbdenis/Code/")[0] will return '/home/jbdenis/Code'
+        # We need that to correctly generate the --files-from files and the src path
+        # that will be used on the rsync command line
+
+        # if src is a single directory, without trailing slash
+        # os.path.split("src") returns ('', 'src')
+    src = random.choice(all_srcs)
+        head, tail = os.path.split(src)
+        if head == '':
+        return os.getcwd()
+        else:
+            return head
+
     try:
         total_size.value = 0
         bucket_nr = 0
         for src in srcs:
-            # do we want to sync to content of src or src itself ?
-            # os.path.split("/home/jbdenis/Code")[0] will return '/home/jbdenis'
-            # os.path.split("/home/jbdenis/Code/")[0] will return '/home/jbdenis/Code'
-            # We need that to correctly generate the --files-from files and the src path
-            # that will be used on the rsync command line
-
-            # if src is a single directory, without trailing slash
-            # os.path.split("src") returns ('', 'src')
-            head, tail = os.path.split(src)
-            if head == '':
-                src_base = os.getcwd()
-            else:
-                src_base = head
-
             for bucket_files_nr, bucket_size, bucket in buckets(src, options.files, options.s):
                 total_size.value += bucket_size
                 total_files_nr.value += bucket_files_nr
@@ -1130,6 +1150,7 @@ def msrsync(options, srcs, dest):
                     continue
                 write_bucket((fileno, filename), bucket, options.compress)
                 bucket_nr += 1
+                src_base = _choose_src_base([src] + options.add_sources)
                 jobs_queue.put((src_base, filename, bucket_files_nr, bucket_size))
 
         crawl_time.value = timeit.default_timer() - crawl_start
@@ -1193,7 +1214,7 @@ def _check_executables():
     RSYNC_EXE = paths["rsync"]
 
 
-def _check_srcs_dest(srcs, dest):
+def _check_srcs_dest(srcs, dsts):
     """
     Check that the supplied arguments are valid
     """
@@ -1205,15 +1226,16 @@ def _check_srcs_dest(srcs, dest):
             print >>sys.stderr, "No access to source directory '%s'" % src
             sys.exit(ESRC_NO_ACCESS)
 
-    # dest may not exist, just as in rsync : "rsync -a src dst" will create
-    # destination if it does not exist. But I prefer to create it here to handle
-    # potential errors
-    if not os.path.exists(dest):
-        try:
-            os.mkdir(dest)
-        except OSError, err:
-            print >>sys.stderr, "Error creating destination directory '%s': %s" % (dest, err)
-            sys.exit(EDEST_CREATE)
+    for dest in dsts:
+        # dest may not exist, just as in rsync : "rsync -a src dst" will create
+        # destination if it does not exist. But I prefer to create it here to handle
+        # potential errors
+        if not os.path.exists(dest):
+            try:
+                os.mkdir(dest)
+            except OSError, err:
+                print >>sys.stderr, "Error creating destination directory '%s': %s" % (dest, err)
+                sys.exit(EDEST_CREATE)
 
     if os.path.isfile(dest):
         print >>sys.stderr, "Destination '%s' already exists and is a file" % dest
@@ -1784,7 +1806,8 @@ def main(cmdline):
         sys.exit(0)
 
     _check_executables()
-    _check_srcs_dest(srcs, dest)
+    _check_srcs_dest(srcs, [dest])
+    _check_srcs_dest(options.add_sources, options.add_dests)
     _check_rsync_options(options.rsync)
     return msrsync(options, srcs, dest)
 
