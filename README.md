@@ -1,3 +1,5 @@
+This project is not actively developped. Please have a look at the alternatives in the motivation section.
+
 # msrsync: maximize rsync bandwidth usage
 
 `msrsync` (multi-stream rsync) is a python wrapper around `rsync`. It only depends on `python >= 2.6` and `rsync`.
