@@ -1,4 +1,4 @@
-This project is not actively developped. Please have a look at the alternatives in the motivation section.
+This project is not actively developed. Please have a look at the alternatives in the motivation section.
 
 # msrsync: maximize rsync bandwidth usage
 
