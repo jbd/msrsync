@@ -10,6 +10,7 @@
 # This file includes a copy of the BSD licensed options.py file from the bup project
 # See https://github.com/bup/bup/blob/master/lib/bup/options.py
 
+from __future__ import print_function
 VERSION = '20170730'
 
 """
@@ -653,7 +654,7 @@ def rmtree_onerror(func, path, exc_info):
     Error handler for shutil.rmtree.
     """
     # pylint: disable=unused-argument
-    print >>sys.stderr, "Error removing", path
+    print("Error removing", path, file=sys.stderr)
 
 
 def write_bucket(filename, bucket, compress=False):
@@ -766,16 +767,16 @@ def _check_rsync_options(options):
         rsync_cmd = "%s %s %s %s" % (RSYNC_EXE, options + ' --quiet --stats --verbose --from0 --log-file %s' % rsync_log, src + os.sep, dst)
         ret, _, stderr, timeout, _ = run(rsync_cmd, timeout_sec=60) # this should not take more than one minute =)
         if timeout:
-            print >>sys.stderr, '''Error during rsync options check command "%s": took more than 60 seconds !''' % rsync_cmd
+            print('''Error during rsync options check command "%s": took more than 60 seconds !''' % rsync_cmd, file=sys.stderr)
             sys.exit(ERSYNC_OPTIONS_CHECK)
         elif ret != 0:
-            print >>sys.stderr, '''Error during rsync options check command "%s": %s''' % (rsync_cmd, 2*os.linesep + stderr)
+            print('''Error during rsync options check command "%s": %s''' % (rsync_cmd, 2*os.linesep + stderr), file=sys.stderr)
             sys.exit(ERSYNC_OPTIONS_CHECK)
     except OSError, err:
         if rsync_cmd:
-            print >>sys.stderr, '''Error during rsync options check command "%s": %s''' % (rsync_cmd, 2*os.linesep + err)
+            print('''Error during rsync options check command "%s": %s''' % (rsync_cmd, 2*os.linesep + err), file=sys.stderr)
         else:
-            print >>sys.stderr, '''Error during rsync options check ("%s"): %s''' % (options, 2*os.linesep + err)
+            print('''Error during rsync options check ("%s"): %s''' % (options, 2*os.linesep + err), file=sys.stderr)
         sys.exit(ERSYNC_OPTIONS_CHECK)
     finally:
         try:
@@ -959,18 +960,18 @@ def messages_worker(options):
             if cur_msg_type == MSG_PROGRESS:
                 print_update(result["message"])
             elif cur_msg_type == MSG_STDOUT:
-                print >>sys.stdout, _e(newline + result["message"])
+                print(_e(newline + result["message"]))
             elif cur_msg_type == MSG_STDERR:
-                print >>sys.stderr, _e(newline + result["message"])
+                print(_e(newline + result["message"]), file=sys.stderr)
             else:
-                print >>sys.stderr, _e(newline + "Unknown message type '%s': %s" % (cur_msg_type, result))
+                print(_e(newline + "Unknown message type '%s': %s" % (cur_msg_type, result)), file=sys.stderr)
             last_msg_type = cur_msg_type
 
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:
         if last_msg_type == MSG_PROGRESS:
-            print >>sys.stdout, ''
+            print('')
 
 def start_rsync_workers(jobs_queue, monitor_queue, options, dest):
     """
@@ -1018,23 +1019,23 @@ def show_stats(msrsync_stat):
     else:
         status = "FAILURE, %d rsync processe(s) had errors" % s["errors"]
 
-    print "Status:", status
-    print "Working directory:", os.getcwd()
-    print "Command line:", " ".join(sys.argv)
-    print "Total size: %s" % get_human_size(s["total_size"])
-    print "Total entries: %s" % s["total_entries"]
+    print("Status:", status)
+    print("Working directory:", os.getcwd())
+    print("Command line:", " ".join(sys.argv))
+    print("Total size: %s" % get_human_size(s["total_size"]))
+    print("Total entries: %s" % s["total_entries"])
     buckets_nr = s["buckets_nr"]
-    print "Buckets number: %d" % buckets_nr
+    print("Buckets number: %d" % buckets_nr)
     if buckets_nr > 0:
-        print "Mean entries per bucket: %d" % ((s["total_entries"] * 1.)/ buckets_nr)
-        print "Mean size per bucket: %s" % get_human_size((s["total_size"] * 1.)/ buckets_nr)
+        print("Mean entries per bucket: %d" % ((s["total_entries"] * 1.)/ buckets_nr))
+        print("Mean size per bucket: %s" % get_human_size((s["total_size"] * 1.)/ buckets_nr))
 
-    print "Entries per second: %d" % s["entries_per_second"]
-    print "Speed: %s/s" % get_human_size(s["bytes_per_second"])
-    print "Rsync workers: %d" % s["rsync_workers"]
-    print "Total rsync's processes (%d) cumulative runtime: %.1fs" % (buckets_nr, s["rsync_runtime"])
-    print "Crawl time: %.1fs (%.1f%% of total runtime)" % (s["crawl_time"], 100* s["crawl_time"]/s["total_time"])
-    print "Total time: %.1fs" % s["total_time"]
+    print("Entries per second: %d" % s["entries_per_second"])
+    print("Speed: %s/s" % get_human_size(s["bytes_per_second"]))
+    print("Rsync workers: %d" % s["rsync_workers"])
+    print("Total rsync's processes (%d) cumulative runtime: %.1fs" % (buckets_nr, s["rsync_runtime"]))
+    print("Crawl time: %.1fs (%.1f%% of total runtime)" % (s["crawl_time"], 100* s["crawl_time"]/s["total_time"]))
+    print("Total time: %.1fs" % s["total_time"])
 
 
 def msrsync(options, srcs, dest):
@@ -1049,18 +1050,18 @@ def msrsync(options, srcs, dest):
             options.buckets = tempfile.mkdtemp(prefix="msrsync-")
         else:
             if not os.path.exists(options.buckets):
-                print >>sys.stderr, options.buckets, "bucket directory does not exist."
+                print(options.buckets, "bucket directory does not exist.", file=sys.stderr)
                 sys.exit(EBUCKET_DIR_NOEXIST)
             if not os.access(options.buckets, os.W_OK):
-                print >>sys.stderr, options.buckets, "bucket directory is not writable."
+                print(options.buckets, "bucket directory is not writable.", file=sys.stderr)
                 sys.exit(EBUCKET_DIR_PERMS)
             options.buckets = tempfile.mkdtemp(prefix="msrsync-", dir=options.buckets)
     except OSError, err:
-        print >>sys.stderr, '''Error with bucket directory creation: "%s"''' % err
+        print('''Error with bucket directory creation: "%s"''' % err, file=sys.stderr)
         sys.exit(EBUCKET_DIR_OSERROR)
 
     if options.show:
-        print "buckets dir is", options.buckets
+        print("buckets dir is", options.buckets)
 
     manager = SyncManager()
     #manager.start(multiprocess_mgr_init) # Oups... This is in python 2.7...
@@ -1165,9 +1166,9 @@ def msrsync(options, srcs, dest):
         messages_worker_proc.terminate()
         messages_worker_proc.join()
     except BucketError, err:
-        print >>sys.stderr, err
+        print(err, file=sys.stderr)
     except Exception: # pylint: disable=broad-except
-        print >>sys.stderr, "Uncaught exception:" + os.linesep + traceback.format_exc()
+        print("Uncaught exception:" + os.linesep + traceback.format_exc(), file=sys.stderr)
     finally:
         manager.shutdown()
         if options.buckets is not None and not options.keep:
@@ -1186,7 +1187,7 @@ def _check_executables():
     for exe in exes:
         prog = which(exe)
         if not prog:
-            print >>sys.stderr, "Cannot find '%s' executable in PATH." % exe
+            print("Cannot find '%s' executable in PATH." % exe, file=sys.stderr)
             sys.exit(EBIN_NOTFOUND)
         paths[exe] = prog
 
@@ -1199,10 +1200,10 @@ def _check_srcs_dest(srcs, dest):
     """
     for src in srcs:
         if not os.path.isdir(src):
-            print >>sys.stderr, "Source '%s' is not a directory" % src
+            print("Source '%s' is not a directory" % src, file=sys.stderr)
             sys.exit(ESRC_NOT_DIR)
         if not os.access(src, os.R_OK|os.X_OK):
-            print >>sys.stderr, "No access to source directory '%s'" % src
+            print("No access to source directory '%s'" % src, file=sys.stderr)
             sys.exit(ESRC_NO_ACCESS)
 
     # dest may not exist, just as in rsync : "rsync -a src dst" will create
@@ -1212,15 +1213,15 @@ def _check_srcs_dest(srcs, dest):
         try:
             os.mkdir(dest)
         except OSError, err:
-            print >>sys.stderr, "Error creating destination directory '%s': %s" % (dest, err)
+            print("Error creating destination directory '%s': %s" % (dest, err), file=sys.stderr)
             sys.exit(EDEST_CREATE)
 
     if os.path.isfile(dest):
-        print >>sys.stderr, "Destination '%s' already exists and is a file" % dest
+        print("Destination '%s' already exists and is a file" % dest, file=sys.stderr)
         sys.exit(EDEST_IS_FILE)
 
     if os.path.isdir(dest) and not os.access(dest, os.W_OK|os.X_OK):
-        print >>sys.stderr, "Destination directory '%s' not writable" % dest
+        print("Destination directory '%s' not writable" % dest, file=sys.stderr)
         sys.exit(EDEST_NO_ACCESS)
 
 
@@ -1641,7 +1642,7 @@ def _check_root(msg=None):
     """ Check if the caller is running under root """
     msg = "Need to be root" if not msg else msg
     if os.geteuid() != 0:
-        print >>sys.stderr, "You're not root. Buffer cache will not be dropped between run. Take the result with caution."
+        print("You're not root. Buffer cache will not be dropped between run. Take the result with caution.", file=sys.stderr)
     return True
 
 
@@ -1654,7 +1655,7 @@ def drop_caches(value=3):
         with open(drop_caches_path, "w") as proc_file:
             proc_file.write(str(value))
     else:
-        print >>sys.stderr, "/proc/sys/vm/drop_caches does not exist. Cannot drop buffer cache"
+        print("/proc/sys/vm/drop_caches does not exist. Cannot drop buffer cache", file=sys.stderr)
 
 
 def bench(total_entries=10000, max_entries_per_level=128, max_depth=5, files_pct=95, src=None, dst=None):
@@ -1668,7 +1669,7 @@ def bench(total_entries=10000, max_entries_per_level=128, max_depth=5, files_pct
         if ret == 666:
             sys.exit(EMSRSYNC_INTERRUPTED)
         if ret != 0 or timeout:
-            print >>sys.stderr, "Problem running %s, aborting benchmark: %s" % (cmd, stderr)
+            print("Problem running %s, aborting benchmark: %s" % (cmd, stderr), file=sys.stderr)
             sys.exit(EBENCH)
         return elapsed
 
@@ -1676,7 +1677,7 @@ def bench(total_entries=10000, max_entries_per_level=128, max_depth=5, files_pct
         """ helper """
         cmd = "%s %s %s %s" % (os.path.realpath(__file__), options, src, dst)
         msrsync_elapsed = _run_or_die(cmd)
-        print >>sys.stdout, "msrsync %s took %.2f seconds (speedup x%.2f)" % (options, msrsync_elapsed, reference_result/msrsync_elapsed)
+        print("msrsync %s took %.2f seconds (speedup x%.2f)" % (options, msrsync_elapsed, reference_result/msrsync_elapsed))
 
 
     _check_executables()
@@ -1695,14 +1696,14 @@ def bench(total_entries=10000, max_entries_per_level=128, max_depth=5, files_pct
 
         _create_fake_tree(src, total_entries=total_entries, max_entries_per_level=max_entries_per_level, max_depth=max_depth, files_pct=files_pct)
 
-        print >>sys.stdout, "Benchmarks with %d entries (%d%% of files):" % (total_entries, files_pct)
+        print("Benchmarks with %d entries (%d%% of files):" % (total_entries, files_pct))
 
         shutil.rmtree(dst_in_dst, onerror=rmtree_onerror)
         drop_caches()
 
         cmd = "%s %s %s %s" % (RSYNC_EXE, DEFAULT_RSYNC_OPTIONS, src + os.sep, dst_in_dst)
         rsync_elapsed = _run_or_die(cmd)
-        print >>sys.stdout, "rsync %s took %.2f seconds (speedup x1)" % (DEFAULT_RSYNC_OPTIONS, rsync_elapsed)
+        print("rsync %s took %.2f seconds (speedup x1)" % (DEFAULT_RSYNC_OPTIONS, rsync_elapsed))
 
         shutil.rmtree(dst_in_dst, onerror=rmtree_onerror)
         drop_caches()
@@ -1745,7 +1746,7 @@ def benchshm(total_entries=10000, max_entries_per_level=128, max_depth=5, files_
         src = tempfile.mkdtemp(dir=shm)
         dst = tempfile.mkdtemp(dir=shm)
     except OSError, err:
-        print >>sys.stderr, "Error creating temporary bench directories in %s: %s" % (shm, err)
+        print("Error creating temporary bench directories in %s: %s" % (shm, err), file=sys.stderr)
         sys.exit(EBENCH)
 
     try:
@@ -1766,9 +1767,9 @@ def main(cmdline):
 
     if options.version:
         if USING_SCANDIR:
-            print >>sys.stdout, "%s" % VERSION
+            print(VERSION)
         else:
-            print >>sys.stdout, "%s (no scandir optimization. Use python 3.5+ or install the scandir module)" % VERSION
+            print("%s (no scandir optimization. Use python 3.5+ or install the scandir module)" % VERSION)
         sys.exit(0)
 
     if options.selftest:
